@@ -1,178 +1,315 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web Launchpad — Pages 5×6 (30 pads)</title>
+  <title>Web Launchpad — 5x6 Pages + Drum</title>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
   <style>
     :root { color-scheme: dark; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e9eef5; -webkit-font-smoothing:antialiased;}
-    main { padding:12px; max-width:900px; margin:0 auto; }
-    header { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:8px; }
-    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .controls .group { display:flex; gap:8px; align-items:center; }
-    .btn { padding:8px 12px; border-radius:10px; border:1px solid #283043; background:#161a24; color:#e9eef5; cursor:pointer; }
-    .btn.primary { background:#1f5eff; border-color:#2a66ff; }
-    .btn.warn { background:#4a3a15; border-color:#6f5621; }
-    .pill { padding:6px 10px; border-radius:999px; border:1px solid #283043; background:#0f1622; }
-    .muted { opacity:.8; font-size:0.95rem; }
-    /* Pager area below controls */
-    .pagerWrap { display:flex; gap:8px; align-items:center; justify-content:center; margin:8px 0 14px; flex-wrap:wrap; }
-    .pagerBtn { padding:8px 12px; border-radius:8px; background:#21242a; border:1px solid #2b3857; color:#e9eef5; }
-    .pageIndicator { font-weight:700; padding:6px 10px; border-radius:8px; background:#0f1622; border:1px solid #283043; }
-    /* Grid: 5 columns */
-    .grid { display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; width:100%; max-width:920px; margin:0 auto 18px; }
-    .pad {
-      aspect-ratio: 1 / 1; /* square */
-      display:flex; align-items:center; justify-content:center;
-      border-radius:12px; font-weight:700; user-select:none;
-      background:#1a2030; border:1px solid #2b3857; color:#e9eef5;
-      touch-action: manipulation;
-      font-size: clamp(14px, 3vw, 18px);
-    }
-    .pad:active { filter:brightness(1.12); transform:translateY(1px); }
-    .pad.flash { background: #ff9b4a !important; color:#0b0b0b; }
-    /* Layers UI */
-    .layersWrap { margin-top:6px; display:flex; flex-direction:column; gap:8px; }
-    .layer { border-radius:10px; background:#0f1622; border:1px solid #27304a; padding:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .layer .name { font-weight:700; }
-    .layer button { padding:6px 10px; border-radius:8px; border:1px solid #283043; background:#161a24; color:#e9eef5; cursor:pointer; }
-    .layer button.recording { background: red !important; animation: blink 1s infinite; color:#fff; }
-    .layer button.recorded  { background: green !important; color:#fff; }
-    @keyframes blink { 0%,50%,100%{background:red} 25%,75%{background:darkred} }
-    /* Responsive */
-    @media (max-width:520px){
-      .grid { gap:8px; }
-      .btn { padding:8px 10px; }
-      header { flex-direction:column; align-items:flex-start; gap:10px; }
-      .pagerWrap { margin-top:6px; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif; background:#0d1014; color:#eaf0fb; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+    header { padding:14px 12px; border-bottom:1px solid #1f2736; display:flex; flex-direction:column; gap:10px; align-items:center; background:linear-gradient(180deg,#0d1014cc,#0d1014); position:sticky; top:0; z-index:20; }
+    .top-row { width:100%; max-width:980px; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
+    .controls { display:flex; gap:8px; align-items:center; }
+    .modeBtn, .btn, .pageBtn { padding:8px 12px; border-radius:10px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; cursor:pointer; }
+    .modeBtn.primary { background:#1f5eff; border-color:#2a66ff; }
+    .small { font-size:0.92rem; color:#c7d1e6; }
+    .pill { padding:6px 10px; border-radius:999px; border:1px solid #2a3445; background:#0f1419; }
+    .page-row { width:100%; max-width:980px; margin-top:6px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
+    .page-row .pager { display:flex; gap:8px; align-items:center; }
+    main { padding:12px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+    /* grid 5 x 6 */
+    #padGrid { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width:min(760px, 96vw); }
+    .pad { aspect-ratio: 1 / 0.9; /* responsive height */ display:flex; align-items:center; justify-content:center; border-radius:10px; font-weight:700; background:#151922; border:1px solid #263044; color:#eaf0fb; user-select:none; touch-action:manipulation; }
+    .pad:active { transform: translateY(1px); filter:brightness(1.12); }
+    .pad.flash { box-shadow:0 0 12px rgba(255,160,50,.12); background: linear-gradient(180deg,#26323f,#1a232c); }
+    .pad.note { background:linear-gradient(180deg,#12161b,#0f1418); }
+    .pad.chord { background:linear-gradient(180deg,#162026,#11161b); }
+    .pad.drum { background:linear-gradient(180deg,#251419,#1b0f12); }
+    /* layers */
+    #layersWrap { width:min(980px,96vw); display:flex; flex-direction:column; gap:8px; }
+    .layer { border-radius:10px; padding:10px; background:#0f1419; border:1px solid #222a38; display:flex; flex-direction:column; gap:8px; }
+    .layer .top { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+    .layer .controls { display:flex; gap:8px; align-items:center; }
+    .layer button { padding:8px 10px; border-radius:8px; border:1px solid #263044; background:#12161b; color:#eaf0fb; cursor:pointer; }
+    .layer button.recording { background: #b52020 !important; color:#fff; animation: blink 1s infinite; border-color:#8f1a1a; }
+    .layer button.activeRec { background: #1fa02b !important; color:#fff; border-color:#16761b; }
+    @keyframes blink { 0%,50%,100%{opacity:1} 25%,75%{opacity:.5} }
+    .muted { color:#9aa6c7; font-size:.92rem; }
+    footer { height:60px; }
+    /* responsive tweaks */
+    @media (max-width:420px){
+      #padGrid { gap:6px; }
+      .pad { font-size:14px; border-radius:8px; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <div class="controls">
-        <div class="group">
-          <label class="muted">Mode</label>
-          <select id="modeSelect" class="btn">
-            <option value="note">Note (Synth)</option>
-            <option value="drum">Drum Kit</option>
-          </select>
-        </div>
 
-        <div class="group">
-          <label class="muted">Octave</label>
+  <header>
+    <div class="top-row">
+      <div class="controls">
+        <button id="modeBtn" class="modeBtn">Mode: Note</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="small muted">Octave</span>
           <button id="octDown" class="btn">−</button>
           <span id="octLabel" class="pill">C3</span>
           <button id="octUp" class="btn">+</button>
         </div>
       </div>
-
-      <div style="display:flex; gap:8px; align-items:center;">
-        <button id="addLayerBtn" class="btn primary">+ Add Layer</button>
-      </div>
-    </header>
-
-    <!-- Pager below controls as requested -->
-    <div class="pagerWrap">
-      <button id="prevPage" class="pagerBtn">⬅ Prev</button>
-      <div class="pageIndicator" id="pageIndicator">Page 1</div>
-      <button id="nextPage" class="pagerBtn">Next ➡</button>
     </div>
 
-    <!-- Grid -->
-    <div id="padGrid" class="grid" aria-label="Pad grid"></div>
+    <div class="page-row">
+      <div class="pager">
+        <button id="prevPage" class="pageBtn">⬅ Prev</button>
+        <span id="pageIndicator" class="pill">Page 1</span>
+        <button id="nextPage" class="pageBtn">Next ➡</button>
+      </div>
+      <div style="width:12px"></div>
+      <button id="addLayerBtn" class="modeBtn primary">+ Add Layer</button>
+    </div>
+  </header>
 
-    <!-- Layers -->
-    <section>
-      <h3 style="margin:8px 0 6px;">Layers</h3>
-      <div id="layersWrap" class="layersWrap"></div>
+  <main>
+    <div id="padGrid" role="grid" aria-label="Launchpad grid"></div>
+
+    <section style="width:min(980px,96vw);">
+      <h3 style="margin:6px 0 8px 0">Layers</h3>
+      <div id="layersWrap"></div>
     </section>
   </main>
+
+  <footer></footer>
 
 <script>
 /* ---------------- Audio / Tone setup ---------------- */
 const synth = new Tone.PolySynth(Tone.Synth, {
   maxPolyphony: 32,
-  options: { envelope: { attack:0.005, decay:0.2, sustain:0.4, release:0.8 } }
+  options: { envelope: { attack: 0.005, decay: 0.18, sustain: 0.38, release: 0.6 } }
 }).toDestination();
 
-/* ---------- Grid & Paging setup ---------- */
-const modeSelect = document.getElementById('modeSelect');
+/* ---------------- Config ---------------- */
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const midiToNote = (m) => `${NOTE_NAMES[m % 12]}${Math.floor(m/12)-1}`;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+let mode = 'note'; // 'note' | 'chord' | 'drum'
+let baseMidi = 48; // C3
+const cols = 5, rows = 6;
+const padsPerPage = cols * rows; // 30
+let currentPage = 0;
+
+// chord bank (flattened across pages)
+const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7","D","E","Fmaj7","G7","A7","B7","Cm","Dm7","Em7","Fm","Gm","Am","Bm","Cmaj7","D7","E7","F6","G6","A6","B6","C6","D6","E6","F#7","G#7","A#7","Bdim7","C9","D9","E9","F9","G9"];
+// drum kit filenames (expect in samples/ folder). If you don't have files, pads will be silent.
+const drumKit = [
+  "kick.wav","snare.wav","hihat_closed.wav","hihat_open.wav",
+  "clap.wav","perc.wav","tom_low.wav","tom_mid.wav",
+  "tom_high.wav","rim.wav","ride.wav","shaker.wav",
+  "crash.wav","fx1.wav","fx2.wav","fx2.wav"
+];
+
+let drumBuffers = {}; // mapping filename -> AudioBuffer
+let drumLoaded = false;
+
+/* Preload drum samples (best-effort). If files absent, it's okay. */
+async function loadDrumSamples(){
+  try {
+    for (const f of drumKit){
+      const url = `samples/${f}`;
+      try {
+        const r = await fetch(url);
+        if (!r.ok) { console.warn('Sample load failed', url); continue; }
+        const ab = await r.arrayBuffer();
+        const decoded = await Tone.context.rawContext.decodeAudioData(ab);
+        drumBuffers[f] = decoded;
+      } catch(e){
+        console.warn('Failed to load sample', f, e);
+      }
+    }
+    drumLoaded = true;
+    console.log('Drum samples load attempted');
+  } catch(e){
+    console.warn('Drum load overall failed', e);
+  }
+}
+loadDrumSamples();
+
+/* ---------------- Grid / Paging ---------------- */
 const padGrid = document.getElementById('padGrid');
-const prevPageBtn = document.getElementById('prevPage');
-const nextPageBtn = document.getElementById('nextPage');
 const pageIndicator = document.getElementById('pageIndicator');
+const modeBtn = document.getElementById('modeBtn');
 const octLabel = document.getElementById('octLabel');
 const octDown = document.getElementById('octDown');
 const octUp = document.getElementById('octUp');
+const prevPageBtn = document.getElementById('prevPage');
+const nextPageBtn = document.getElementById('nextPage');
 const addLayerBtn = document.getElementById('addLayerBtn');
-const layersWrap = document.getElementById('layersWrap');
 
-const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-function midiToNote(m){ return `${NOTE_NAMES[m%12]}${Math.floor(m/12)-1}`; }
-function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-
-/* Page system: 5 x 6 = 30 pads per page */
-const COLS = 5, ROWS = 6, PADS_PER_PAGE = COLS * ROWS;
-let currentPage = 0;
-
-/* baseMidi always points to a C (so octave steps are +/-12) */
-let baseMidi = 48; // C3 (MIDI 48)
 function updateOctLabel(){ octLabel.textContent = midiToNote(baseMidi); }
+updateOctLabel();
 
-/* ---------- Chord bank (optional) ---------- */
-/* (kept for chord mode if you want chord presets per pad) */
-function getChordNotes(chord){
-  const map = {
-    C:["C4","E4","G4"], Dm:["D4","F4","A4"], Em:["E4","G4","B4"],
-    F:["F4","A4","C5"], G:["G4","B4","D5"], Am:["A4","C5","E5"],
-    Bdim:["B4","D5","F5"], C7:["C4","E4","G4","A#4"]
-  };
-  return map[chord] || ["C4"];
-}
+octDown.addEventListener('click', ()=> { baseMidi = clamp(baseMidi-12, 24, 84); updateOctLabel(); renderGrid(); });
+octUp.addEventListener('click', ()=> { baseMidi = clamp(baseMidi+12, 24, 84); updateOctLabel(); renderGrid(); });
 
-/* ---------- Drum kit (fixed pack) ---------- */
-/* Put sample files in `samples/` next to this index.html
-   Example sample names below. Replace with your own files.
-*/
-const drumFiles = [
-  "kick.wav","snare.wav","hihat_closed.wav","hihat_open.wav",
-  "clap.wav","tom_low.wav","tom_mid.wav","tom_high.wav",
-  "rim.wav","perc1.wav","perc2.wav","shaker.wav",
-  "crash.wav","ride.wav","fx1.wav","fx2.wav"
-];
-// We'll create Tone.Players mapping name -> Player
-const drumPlayers = {}; // key: filename -> Tone.Player
-
-async function loadDrumKit(){
-  // load each sample into a Tone.Player
-  for (const f of drumFiles){
-    const url = `samples/${f}`; // update if you host elsewhere
-    const p = new Tone.Player(url).toDestination();
-    await p.load(); // wait
-    drumPlayers[f] = p;
-  }
-  // ready
-  console.log("Drum kit loaded:", Object.keys(drumPlayers).length);
-}
-
-/* try loading drum kit in background (non-blocking) */
-loadDrumKit().catch(err => {
-  console.warn("Drum kit load error (it's ok if you don't have samples yet):", err);
+modeBtn.addEventListener('click', () => {
+  if (mode === 'note') mode = 'chord';
+  else if (mode === 'chord') mode = 'drum';
+  else mode = 'note';
+  modeBtn.textContent = `Mode: ${mode.charAt(0).toUpperCase()+mode.slice(1)}`;
+  // reset page
+  currentPage = 0;
+  renderGrid();
 });
 
-/* ---------- Layers (unlimited) ---------- */
+/* calculate total pages for each mode */
+function totalPagesForMode(){
+  if (mode === 'note') {
+    // let's allow many pages of chromatic notes (e.g., 6 octaves -> 72 pads)
+    const totalNotes = 72; // e.g., C2..B7
+    return Math.ceil(totalNotes / padsPerPage);
+  } else if (mode === 'chord') {
+    return Math.ceil(chordBank.length / padsPerPage);
+  } else {
+    // drum: repeat drumKit to fill multiple pages if needed; treat drumKit length as base
+    return Math.ceil((drumKit.length) / padsPerPage) || 1;
+  }
+}
+
+prevPageBtn.addEventListener('click', ()=>{ if (currentPage>0) currentPage--; renderGrid(); });
+nextPageBtn.addEventListener('click', ()=>{ currentPage++; renderGrid(); });
+
+/* ---------------- Play functions ---------------- */
+async function ensureAudioStarted(){ try{ await Tone.start(); }catch{} }
+
+function flashPad(el){
+  if(!el) return;
+  el.classList.add('flash');
+  setTimeout(()=> el.classList.remove('flash'), 140);
+}
+
+function playNote(note, whenSec = 0, dur = 0.25){
+  synth.triggerAttackRelease(note, dur + "s", Tone.now() + whenSec);
+  // record into active layers
+  layers.forEach(L => {
+    if (L.isRecording) {
+      const t = performance.now() - L.recStartTime;
+      L.events.push({ time: t, type: 'note', value: note, dur });
+    }
+  });
+}
+
+function playChordName(chordName, whenSec = 0, dur = 1.0){
+  // map simple chords to notes (basic mapping)
+  const map = {
+    "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"], "F":["F4","A4","C5"],
+    "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"], "C7":["C4","E4","G4","A#4"]
+  };
+  const notes = map[chordName] || [chordName]; // if chordName is not in map maybe it's a note
+  synth.triggerAttackRelease(notes, dur + "s", Tone.now() + whenSec);
+  layers.forEach(L => {
+    if (L.isRecording) {
+      const t = performance.now() - L.recStartTime;
+      L.events.push({ time: t, type: 'chord', value: chordName, dur });
+    }
+  });
+}
+
+function playDrumByFilename(fname){
+  const buf = drumBuffers[fname];
+  if (!buf){
+    // missing sample — silent, but still record event
+    console.warn('Missing sample', fname);
+    layers.forEach(L => {
+      if (L.isRecording) {
+        const t = performance.now() - L.recStartTime;
+        L.events.push({ time: t, type: 'drum', value: fname });
+      }
+    });
+    return;
+  }
+  const src = Tone.context.rawContext.createBufferSource();
+  src.buffer = buf;
+  src.connect(Tone.context.rawContext.destination);
+  src.start();
+  layers.forEach(L => {
+    if (L.isRecording) {
+      const t = performance.now() - L.recStartTime;
+      L.events.push({ time: t, type: 'drum', value: fname });
+    }
+  });
+}
+
+/* ---------------- Render Grid per page ---------------- */
+function renderGrid(){
+  padGrid.innerHTML = '';
+  const pages = totalPagesForMode();
+  // clamp currentPage
+  if (currentPage < 0) currentPage = 0;
+  if (currentPage >= pages) currentPage = pages-1;
+
+  pageIndicator.textContent = `Page ${currentPage+1}`;
+
+  // generate pads for page
+  if (mode === 'note') {
+    // choose a range of notes — we'll map pages to contiguous chromatic notes
+    // totalNotes chosen earlier; start note = baseMidi - (some offset to get range)
+    const totalNotes = 72; // from C2..B7 maybe
+    const globalStart = baseMidi - 12; // offset so pages include lower octaves too
+    const startIndex = currentPage * padsPerPage;
+    for (let i=0;i<padsPerPage;i++){
+      const globalIdx = startIndex + i;
+      const midi = globalStart + globalIdx;
+      const note = midiToNote(midi);
+      const btn = document.createElement('button');
+      btn.className = 'pad note';
+      btn.innerText = note;
+      btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playNote(note); };
+      padGrid.appendChild(btn);
+    }
+  } else if (mode === 'chord') {
+    const start = currentPage * padsPerPage;
+    for (let i=0;i<padsPerPage;i++){
+      const idx = start + i;
+      const chordName = chordBank[idx % chordBank.length] || chordBank[idx % chordBank.length];
+      const btn = document.createElement('button');
+      btn.className = 'pad chord';
+      btn.innerText = chordName;
+      btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playChordName(chordName); };
+      padGrid.appendChild(btn);
+    }
+  } else { // drum
+    // map drumKit into pages; if drumKit < padsPerPage, repeat sample order
+    const start = currentPage * padsPerPage;
+    for (let i=0;i<padsPerPage;i++){
+      const idx = (start + i) % drumKit.length;
+      const filename = drumKit[idx];
+      const label = filename.replace(/\.[^/.]+$/, "");
+      const btn = document.createElement('button');
+      btn.className = 'pad drum';
+      btn.innerText = label;
+      btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playDrumByFilename(filename); };
+      padGrid.appendChild(btn);
+    }
+  }
+}
+
+/* initial render */
+renderGrid();
+
+/* ---------------- Layers (unlimited) ---------------- */
 let layers = [];
 let idCounter = 0;
-function createLayer(){
+const layersWrap = document.getElementById('layersWrap');
+
+addLayerBtn.addEventListener('click', addLayer);
+
+function addLayer(){
   const id = `L${++idCounter}`;
   const layer = {
     id,
     name: `Layer ${layers.length+1}`,
-    events: [], // {time(ms), type:'note'|'sample', value, dur}
+    events: [],
     isRecording: false,
     isPlaying: false,
     recStartTime: 0,
@@ -181,121 +318,24 @@ function createLayer(){
   };
   layers.push(layer);
   renderLayers();
-  return layer;
-}
-addLayerBtn.addEventListener('click', createLayer);
-
-/* ---------- Render pads (per page) ---------- */
-function renderGrid(){
-  padGrid.innerHTML = '';
-  const mode = modeSelect.value;
-  const startIndex = currentPage * PADS_PER_PAGE;
-
-  for (let i=0;i<PADS_PER_PAGE;i++){
-    const padIndex = startIndex + i;
-    const btn = document.createElement('button');
-    btn.className = 'pad';
-    // label & data depending on mode
-    if (mode === 'note'){
-      const midi = baseMidi + padIndex; // sequential notes starting from C
-      // BUT we want pages to start from baseMidi + page*PADS_PER_PAGE
-      // so adjust: noteMidi = baseMidi + (currentPage*PADS_PER_PAGE) + i
-      const noteMidi = baseMidi + (currentPage * PADS_PER_PAGE) + i;
-      const noteName = midiToNote(noteMidi);
-      btn.textContent = noteName;
-      btn.dataset.type = 'note';
-      btn.dataset.value = noteName;
-    } else { // drum mode
-      // assign sample from drumFiles by cycling
-      const sample = drumFiles[i % drumFiles.length];
-      btn.textContent = sample.replace(/\.[^/.]+$/,""); // remove ext
-      btn.dataset.type = 'sample';
-      btn.dataset.value = sample;
-    }
-
-    // interaction
-    btn.addEventListener('click', async () => {
-      await Tone.start(); // ensure audio context resumed on user gesture
-      playPad(btn);
-    });
-
-    padGrid.appendChild(btn);
-  }
-
-  pageIndicator.textContent = `Page ${currentPage + 1}`;
 }
 
-/* Prev/Next behavior */
-prevPageBtn.addEventListener('click', () => {
-  if (currentPage > 0) currentPage--;
-  renderGrid();
-});
-nextPageBtn.addEventListener('click', () => {
-  currentPage++;
-  renderGrid();
-});
-
-/* Octave control: always step by 12 (C -> next C) */
-octDown.addEventListener('click', () => { baseMidi = clamp(baseMidi - 12, 24, 84); updateOctLabel(); renderGrid(); });
-octUp.addEventListener('click',   () => { baseMidi = clamp(baseMidi + 12, 24, 84); updateOctLabel(); renderGrid(); });
-modeSelect.addEventListener('change', () => { currentPage = 0; renderGrid(); });
-
-updateOctLabel();
-renderGrid();
-
-/* ---------- Play pad & record capture ---------- */
-function flashPad(btn){
-  btn.classList.add('flash');
-  setTimeout(()=> btn.classList.remove('flash'), 140);
-}
-
-function playPad(btn, whenSec = 0, dur = 0.25){
-  const type = btn.dataset.type;
-  const value = btn.dataset.value;
-  flashPad(btn);
-
-  if (type === 'note'){
-    // synth play
-    synth.triggerAttackRelease(value, dur + "s", Tone.now() + whenSec);
-    // record to any recording layer
-    layers.forEach(L => {
-      if (L.isRecording){
-        const t = performance.now() - L.recStartTime;
-        L.events.push({ time:t, type:'note', value, dur });
-      }
-    });
-  } else if (type === 'sample'){
-    const player = drumPlayers[value];
-    if (player && player.buffer){
-      player.start(undefined, 0, player.buffer.duration); // play immediately
-    } else {
-      // fallback: use Tone.Player on the fly (may be slow)
-      const tmp = new Tone.Player(`samples/${value}`).toDestination();
-      tmp.autostart = true;
-      tmp.load().catch(()=>{}); // attempt load
-    }
-    layers.forEach(L => {
-      if (L.isRecording){
-        const t = performance.now() - L.recStartTime;
-        L.events.push({ time:t, type:'sample', value }); // value is filename
-      }
-    });
-  }
-}
-
-/* ---------- Layer rendering & controls ---------- */
 function renderLayers(){
   layersWrap.innerHTML = '';
   layers.forEach((L, idx) => {
     const el = document.createElement('div');
     el.className = 'layer';
     el.id = L.id;
+
     el.innerHTML = `
-      <div style="display:flex;gap:12px;align-items:center;flex:1;flex-wrap:wrap;">
-        <div class="name">${L.name}</div>
-        <div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
+      <div class="top">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div style="font-weight:700">${L.name}</div>
+          <div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
+        </div>
+        <div class="muted small">Loop: <span id="${L.id}-loop">—</span></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="controls">
         <button data-act="record" data-id="${L.id}">● Record</button>
         <button data-act="stoprec" data-id="${L.id}">■ Stop</button>
         <button data-act="play" data-id="${L.id}">▶ Play</button>
@@ -303,25 +343,25 @@ function renderLayers(){
         <button data-act="clear" data-id="${L.id}">⟲ Clear</button>
         <button data-act="delete" data-id="${L.id}">✖ Delete</button>
       </div>
-      <div style="margin-left:auto; margin-top:6px; font-size:0.9rem; color:#aeb6c3;">
-        Loop: <span id="${L.id}-loop">—</span>
-      </div>
     `;
     layersWrap.appendChild(el);
 
-    // apply visual state to record button
-    const recBtn = el.querySelector('button[data-act="record"]');
+    // style record button state
+    const recBtn = el.querySelector('[data-act="record"]');
     if (L.isRecording) recBtn.classList.add('recording');
-    else if (L.events.length > 0) recBtn.classList.add('recorded');
+    else if (L.events.length > 0) recBtn.classList.add('activeRec');
   });
 }
-layersWrap.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-act]');
+
+/* Delegate click actions in layersWrap */
+layersWrap.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-act]');
   if (!btn) return;
   const act = btn.dataset.act;
   const id = btn.dataset.id;
-  const L = layers.find(x=>x.id === id);
+  const L = layers.find(x => x.id === id);
   if (!L) return;
+
   if (act === 'record') startRecord(L);
   if (act === 'stoprec') stopRecord(L);
   if (act === 'play') startPlay(L);
@@ -330,21 +370,20 @@ layersWrap.addEventListener('click', (e) => {
   if (act === 'delete') deleteLayer(L);
 });
 
-/* ---------- Recording logic ---------- */
+/* Recording */
 function startRecord(L){
   clearScheduled(L);
   L.events = [];
   L.isRecording = true;
   L.recStartTime = performance.now();
-  setLoopLabel(L, 'rec…');
+  setLoopLabel(L, 'recording…');
   renderLayers();
 }
 function stopRecord(L){
   L.isRecording = false;
-  // compute loop length
   if (L.events.length > 0){
     const last = L.events[L.events.length - 1].time;
-    L.loopLengthMs = Math.max(800, last + 250);
+    L.loopLengthMs = Math.max(1000, last + 500);
   } else {
     L.loopLengthMs = 0;
   }
@@ -352,9 +391,9 @@ function stopRecord(L){
   renderLayers();
 }
 
-/* ---------- Playback scheduling ---------- */
+/* Playback scheduling */
 function startPlay(L){
-  if (L.events.length === 0) { alert('Layer kosong.'); return; }
+  if (L.events.length === 0){ alert('Layer kosong.'); return; }
   if (L.isPlaying) return;
   L.isPlaying = true;
   scheduleLayer(L);
@@ -365,80 +404,81 @@ function stopPlay(L){
   clearScheduled(L);
   renderLayers();
 }
+
 function scheduleLayer(L){
   clearScheduled(L);
-  const loopMs = L.loopLengthMs || (L.events[L.events.length-1].time + 400);
+  const loopMs = L.loopLengthMs || (L.events[L.events.length-1].time + 500);
   const t0 = performance.now();
-  // schedule all events relative to now
   for (const ev of L.events){
     const delay = Math.max(0, ev.time - (performance.now() - t0));
-    const h = setTimeout(()=> {
-      // when fired, play using current mapping (note or sample)
-      if (ev.type === 'note') {
-        playPadByValue(ev.value, ev.dur ?? 0.25);
-      } else if (ev.type === 'sample') {
-        playSampleByName(ev.value);
-      }
+    const h = setTimeout(() => {
+      // trigger event (note/chord/drum)
+      if (ev.type === 'note') playNote(ev.value, 0, ev.dur ?? 0.25);
+      if (ev.type === 'chord') playChordName(ev.value, 0, ev.dur ?? 1.0);
+      if (ev.type === 'drum') playDrumByFilename(ev.value);
+      // visual flash optional: find pad with matching label on current page? skip visual for scheduled playback
     }, delay);
     L.timers.push(h);
   }
-  // schedule next loop
-  const loopHandle = setTimeout(()=> {
+  // loop reschedule
+  const loopHandle = setTimeout(() => {
     if (L.isPlaying) scheduleLayer(L);
   }, loopMs);
   L.timers.push(loopHandle);
 }
-function clearScheduled(L){ L.timers.forEach(h=>clearTimeout(h)); L.timers = []; }
 
-/* helpers to play by stored value (not button element) */
-function playPadByValue(value, dur=0.25){
-  // value might be note name or sample filename
-  // find any pad element that has that value to flash visually (optional)
-  const btn = [...padGrid.children].find(b => b.dataset.value === value);
-  if (btn) flashPad(btn);
-  if (value.includes('#') || /[A-G][0-9]/.test(value)) {
-    // assume note
-    synth.triggerAttackRelease(value, dur + "s", Tone.now());
-  } else {
-    // sample file
-    playSampleByName(value);
-  }
-}
-function playSampleByName(filename){
-  const player = drumPlayers[filename];
-  if (player && player.buffer){
-    player.start();
-  } else {
-    // fallback
-    const tmp = new Tone.Player(`samples/${filename}`).toDestination();
-    tmp.autostart = true;
-    tmp.load().catch(()=>{});
-  }
+function clearScheduled(L){
+  L.timers.forEach(h => clearTimeout(h));
+  L.timers = [];
 }
 
-/* ---------- Layer utilities ---------- */
-function clearLayer(L){ stopPlay(L); L.events = []; L.loopLengthMs = 0; setLoopLabel(L,'—'); renderLayers(); }
-function deleteLayer(L){ stopPlay(L); layers = layers.filter(x => x.id !== L.id); renderLayers(); }
-function setLoopLabel(L, txt){ const el = document.getElementById(`${L.id}-loop`); if (el) el.textContent = txt; }
+/* Utilities for layers */
+function clearLayer(L){
+  stopPlay(L);
+  L.events = [];
+  L.loopLengthMs = 0;
+  setLoopLabel(L, '—');
+  renderLayers();
+}
 
-/* ---------- Bootstrap: create one default layer ---------- */
-createLayer();
-renderLayers();
+function deleteLayer(L){
+  stopPlay(L);
+  layers = layers.filter(x => x.id !== L.id);
+  renderLayers();
+}
 
-/* ---------- Keyboard (optional) ---------- */
-/* Map first 30 keys? Not necessary for mobile; keep minimal */
-window.addEventListener('keydown', (e) => {
-  // simple mapping: numbers 1..9 etc not defined here
+function setLoopLabel(L, txt){
+  const el = document.getElementById(`${L.id}-loop`);
+  if (el) el.textContent = txt;
+}
+
+/* ---------------- Keyboard (map small subset) ---------------- */
+const keyMap = ['z','x','c','v','b','n','m','q','w','e','r','t','y','u','i','o'];
+window.addEventListener('keydown', async (ev) => {
+  if (ev.repeat) return;
+  const k = ev.key.toLowerCase();
+  const idx = keyMap.indexOf(k);
+  if (idx === -1) return;
+  const pageStart = currentPage * padsPerPage;
+  if (mode === 'note'){
+    const midi = baseMidi - 12 + pageStart + idx;
+    const note = midiToNote(midi);
+    await ensureAudioStarted();
+    playNote(note);
+  } else if (mode === 'chord'){
+    const name = chordBank[(currentPage * padsPerPage + idx) % chordBank.length];
+    await ensureAudioStarted();
+    playChordName(name);
+  } else {
+    const fname = drumKit[(currentPage * padsPerPage + idx) % drumKit.length];
+    await ensureAudioStarted();
+    playDrumByFilename(fname);
+  }
 });
 
-/* ---------- Notes ---------- */
-/*
-Folder: place your drum WAVs at ./samples/<filename>
-Example drumFiles defined above.
+/* ---------------- Init with one layer ---------------- */
+addLayer();
 
-If you want to change the total pads per page, update COLS/ROWS and PADS_PER_PAGE vars.
-baseMidi is always C (so octave +/- changes move to next/prev C).
-*/
 </script>
 </body>
 </html>
