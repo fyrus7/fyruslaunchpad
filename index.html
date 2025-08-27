@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Web Launchpad</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #fff; text-align: center; }
+    .grid { display: grid; grid-template-columns: repeat(4, 100px); gap: 10px; justify-content: center; margin-top: 20px; }
+    button { padding: 10px; font-size: 14px; border: none; border-radius: 8px; background: #333; color: #fff; cursor: pointer; }
+    button:active { background: #555; }
+    .layer { margin: 10px auto; padding: 10px; border: 1px solid #444; border-radius: 8px; width: 350px; }
+    .controls { margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Web Launchpad</h1>
+  <button onclick="toggleScale()">Switch Major/Minor</button>
+  <div class="grid" id="padGrid"></div>
+
+  <h2>Layers</h2>
+  <div id="layers"></div>
+  <button onclick="addLayer()">+ Add Layer</button>
+
+<script>
+const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+let isMajor = true;
+
+const majorChords = ["C","D","E","F","G","A","B","C"];
+const minorChords = ["Cm","Dm","Em","Fm","Gm","Am","Bm","Cm"];
+
+function buildPads() {
+  const grid = document.getElementById("padGrid");
+  grid.innerHTML = "";
+  const chords = isMajor ? majorChords : minorChords;
+  chords.forEach(ch => {
+    const btn = document.createElement("button");
+    btn.innerText = ch;
+    btn.onclick = () => playChord(ch);
+    grid.appendChild(btn);
+  });
+}
+buildPads();
+
+function toggleScale() {
+  isMajor = !isMajor;
+  buildPads();
+}
+
+function getChordNotes(chord) {
+  const map = {
+    "C":["C4","E4","G4"], "D":["D4","F#4","A4"], "E":["E4","G#4","B4"],
+    "F":["F4","A4","C5"], "G":["G4","B4","D5"], "A":["A4","C#5","E5"], "B":["B4","D#5","F#5"],
+    "Cm":["C4","D#4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"],
+    "Fm":["F4","G#4","C5"], "Gm":["G4","A#4","D5"], "Am":["A4","C5","E5"], "Bm":["B4","D5","F#5"],
+  };
+  return map[chord] || ["C4"];
+}
+
+function playChord(chord) {
+  const now = Tone.now();
+  const notes = getChordNotes(chord);
+  synth.triggerAttackRelease(notes, "1n", now);
+
+  // kalau ada layer sedang record, simpan event
+  layers.forEach(layer => {
+    if (layer.isRecording) {
+      layer.events.push({time: now - layer.startTime, chord: chord});
+    }
+  });
+}
+
+// ================= Layers ==================
+let layers = [];
+
+function addLayer() {
+  const idx = layers.length;
+  const layer = { events: [], isRecording: false, isPlaying: false, loopId: null, startTime: 0 };
+  layers.push(layer);
+
+  const div = document.createElement("div");
+  div.className = "layer";
+  div.innerHTML = `<b>Layer ${idx+1}</b>
+    <div class="controls">
+      <button onclick="recordLayer(${idx})">Record</button>
+      <button onclick="stopRecord(${idx})">Stop</button>
+      <button onclick="playLayer(${idx})">Play</button>
+      <button onclick="stopLayer(${idx})">Stop Play</button>
+      <button onclick="clearLayer(${idx})">Clear</button>
+    </div>`;
+  document.getElementById("layers").appendChild(div);
+}
+
+function recordLayer(i) {
+  layers[i].events = [];
+  layers[i].isRecording = true;
+  layers[i].startTime = Tone.now();
+  alert("Recording Layer " + (i+1));
+}
+function stopRecord(i) {
+  layers[i].isRecording = false;
+  alert("Stopped Recording Layer " + (i+1) + " (" + layers[i].events.length + " events)");
+}
+function playLayer(i) {
+  if (layers[i].events.length === 0) { alert("No events in Layer " + (i+1)); return; }
+  layers[i].isPlaying = true;
+  const duration = layers[i].events[layers[i].events.length-1].time + 2; // loop length
+  function schedule() {
+    layers[i].events.forEach(e => {
+      synth.triggerAttackRelease(getChordNotes(e.chord), "1n", Tone.now() + e.time);
+    });
+  }
+  schedule();
+  layers[i].loopId = setInterval(schedule, duration*1000);
+}
+function stopLayer(i) {
+  layers[i].isPlaying = false;
+  if (layers[i].loopId) clearInterval(layers[i].loopId);
+}
+function clearLayer(i) {
+  stopLayer(i);
+  layers[i].events = [];
+  alert("Layer " + (i+1) + " cleared");
+}
+</script>
+</body>
+</html>
