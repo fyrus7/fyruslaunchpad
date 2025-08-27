@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web Launchpad — 5x6 Pages + Drum</title>
+  <title>Web Launchpad — 5x6 Pages + Drum (Fixed)</title>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
   <style>
     :root { color-scheme: dark; }
@@ -16,11 +16,11 @@
     .small { font-size:0.92rem; color:#c7d1e6; }
     .pill { padding:6px 10px; border-radius:999px; border:1px solid #2a3445; background:#0f1419; }
     .page-row { width:100%; max-width:980px; margin-top:6px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
-    .page-row .pager { display:flex; gap:8px; align-items:center; }
     main { padding:12px; display:flex; flex-direction:column; align-items:center; gap:14px; }
     /* grid 5 x 6 */
     #padGrid { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width:min(760px, 96vw); }
-    .pad { aspect-ratio: 1 / 0.9; /* responsive height */ display:flex; align-items:center; justify-content:center; border-radius:10px; font-weight:700; background:#151922; border:1px solid #263044; color:#eaf0fb; user-select:none; touch-action:manipulation; }
+    .pad { display:flex; align-items:center; justify-content:center; border-radius:10px; font-weight:700; background:#151922; border:1px solid #263044; color:#eaf0fb; user-select:none; touch-action:manipulation; padding:6px; min-height:64px; }
+    .pad .label { white-space:normal; text-align:center; line-height:1.05; font-size:14px; }
     .pad:active { transform: translateY(1px); filter:brightness(1.12); }
     .pad.flash { box-shadow:0 0 12px rgba(255,160,50,.12); background: linear-gradient(180deg,#26323f,#1a232c); }
     .pad.note { background:linear-gradient(180deg,#12161b,#0f1418); }
@@ -30,17 +30,19 @@
     #layersWrap { width:min(980px,96vw); display:flex; flex-direction:column; gap:8px; }
     .layer { border-radius:10px; padding:10px; background:#0f1419; border:1px solid #222a38; display:flex; flex-direction:column; gap:8px; }
     .layer .top { display:flex; gap:8px; align-items:center; justify-content:space-between; }
-    .layer .controls { display:flex; gap:8px; align-items:center; }
+    .layer .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .layer button { padding:8px 10px; border-radius:8px; border:1px solid #263044; background:#12161b; color:#eaf0fb; cursor:pointer; }
     .layer button.recording { background: #b52020 !important; color:#fff; animation: blink 1s infinite; border-color:#8f1a1a; }
     .layer button.activeRec { background: #1fa02b !important; color:#fff; border-color:#16761b; }
     @keyframes blink { 0%,50%,100%{opacity:1} 25%,75%{opacity:.5} }
     .muted { color:#9aa6c7; font-size:.92rem; }
+    .msg { color:#f2c94c; font-weight:600; margin-left:6px; }
     footer { height:60px; }
     /* responsive tweaks */
     @media (max-width:420px){
       #padGrid { gap:6px; }
-      .pad { font-size:14px; border-radius:8px; }
+      .pad .label { font-size:13px; }
+      .pad { min-height:58px; }
     }
   </style>
 </head>
@@ -99,27 +101,27 @@ const cols = 5, rows = 6;
 const padsPerPage = cols * rows; // 30
 let currentPage = 0;
 
-// chord bank (flattened across pages)
+/* chord bank */
 const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7","D","E","Fmaj7","G7","A7","B7","Cm","Dm7","Em7","Fm","Gm","Am","Bm","Cmaj7","D7","E7","F6","G6","A6","B6","C6","D6","E6","F#7","G#7","A#7","Bdim7","C9","D9","E9","F9","G9"];
-// drum kit filenames (expect in samples/ folder). If you don't have files, pads will be silent.
+
+/* drum kit (filenames inside samples/) */
 const drumKit = [
   "kick.wav","snare.wav","hihat_closed.wav","hihat_open.wav",
   "clap.wav","perc.wav","tom_low.wav","tom_mid.wav",
   "tom_high.wav","rim.wav","ride.wav","shaker.wav",
-  "crash.wav","fx1.wav","fx2.wav","fx2.wav"
+  "crash.wav","fx1.wav","fx2.wav","fx3.wav"
 ];
 
-let drumBuffers = {}; // mapping filename -> AudioBuffer
+let drumBuffers = {}; // filename -> AudioBuffer
 let drumLoaded = false;
 
-/* Preload drum samples (best-effort). If files absent, it's okay. */
 async function loadDrumSamples(){
   try {
     for (const f of drumKit){
       const url = `samples/${f}`;
       try {
         const r = await fetch(url);
-        if (!r.ok) { console.warn('Sample load failed', url); continue; }
+        if (!r.ok) { console.warn('Sample missing', url); continue; }
         const ab = await r.arrayBuffer();
         const decoded = await Tone.context.rawContext.decodeAudioData(ab);
         drumBuffers[f] = decoded;
@@ -157,27 +159,18 @@ modeBtn.addEventListener('click', () => {
   else if (mode === 'chord') mode = 'drum';
   else mode = 'note';
   modeBtn.textContent = `Mode: ${mode.charAt(0).toUpperCase()+mode.slice(1)}`;
-  // reset page
   currentPage = 0;
   renderGrid();
 });
 
-/* calculate total pages for each mode */
 function totalPagesForMode(){
-  if (mode === 'note') {
-    // let's allow many pages of chromatic notes (e.g., 6 octaves -> 72 pads)
-    const totalNotes = 72; // e.g., C2..B7
-    return Math.ceil(totalNotes / padsPerPage);
-  } else if (mode === 'chord') {
-    return Math.ceil(chordBank.length / padsPerPage);
-  } else {
-    // drum: repeat drumKit to fill multiple pages if needed; treat drumKit length as base
-    return Math.ceil((drumKit.length) / padsPerPage) || 1;
-  }
+  if (mode === 'note') { const totalNotes = 72; return Math.ceil(totalNotes / padsPerPage); }
+  if (mode === 'chord') { return Math.ceil(chordBank.length / padsPerPage); }
+  return Math.ceil(Math.max(drumKit.length, 1) / padsPerPage);
 }
 
 prevPageBtn.addEventListener('click', ()=>{ if (currentPage>0) currentPage--; renderGrid(); });
-nextPageBtn.addEventListener('click', ()=>{ currentPage++; renderGrid(); });
+nextPageBtn.addEventListener('click', ()=>{ if (currentPage < totalPagesForMode()-1) currentPage++; renderGrid(); });
 
 /* ---------------- Play functions ---------------- */
 async function ensureAudioStarted(){ try{ await Tone.start(); }catch{} }
@@ -190,72 +183,51 @@ function flashPad(el){
 
 function playNote(note, whenSec = 0, dur = 0.25){
   synth.triggerAttackRelease(note, dur + "s", Tone.now() + whenSec);
-  // record into active layers
-  layers.forEach(L => {
-    if (L.isRecording) {
-      const t = performance.now() - L.recStartTime;
-      L.events.push({ time: t, type: 'note', value: note, dur });
-    }
-  });
+  layers.forEach(L => { if (L.isRecording) { const t = performance.now() - L.recStartTime; L.events.push({ time: t, type: 'note', value: note, dur }); L.msg = ''; } });
 }
 
-function playChordName(chordName, whenSec = 0, dur = 1.0){
-  // map simple chords to notes (basic mapping)
+function getChordNotes(chord) {
   const map = {
     "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"], "F":["F4","A4","C5"],
-    "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"], "C7":["C4","E4","G4","A#4"]
+    "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"], "C7":["C4","E4","G4","A#4"],
+    "Cm":["C4","D#4","G4"], "Dm7":["D4","F4","A4","C5"], "Em7":["E4","G4","B4","D5"]
   };
-  const notes = map[chordName] || [chordName]; // if chordName is not in map maybe it's a note
-  synth.triggerAttackRelease(notes, dur + "s", Tone.now() + whenSec);
-  layers.forEach(L => {
-    if (L.isRecording) {
-      const t = performance.now() - L.recStartTime;
-      L.events.push({ time: t, type: 'chord', value: chordName, dur });
-    }
-  });
+  return map[chord] || null;
+}
+function playChordName(chordName, whenSec = 0, dur = 1.0){
+  const notes = getChordNotes(chordName);
+  if (notes) {
+    synth.triggerAttackRelease(notes, dur + "s", Tone.now() + whenSec);
+  } else {
+    // if unknown chord name, try to play it as single note string
+    try { synth.triggerAttackRelease(chordName, dur + "s", Tone.now() + whenSec); } catch(e){ console.warn('Unknown chord', chordName); }
+  }
+  layers.forEach(L => { if (L.isRecording) { const t = performance.now() - L.recStartTime; L.events.push({ time: t, type: 'chord', value: chordName, dur }); L.msg = ''; } });
 }
 
-function playDrumByFilename(fname){
+function playDrumByFilename(fname, whenSec = 0){
   const buf = drumBuffers[fname];
-  if (!buf){
-    // missing sample — silent, but still record event
-    console.warn('Missing sample', fname);
-    layers.forEach(L => {
-      if (L.isRecording) {
-        const t = performance.now() - L.recStartTime;
-        L.events.push({ time: t, type: 'drum', value: fname });
-      }
-    });
-    return;
-  }
+  layers.forEach(L => { if (L.isRecording) { const t = performance.now() - L.recStartTime; L.events.push({ time: t, type: 'drum', value: fname }); L.msg = ''; } });
+  if (!buf) return; // silent if missing
+  // schedule using AudioContext.currentTime (Tone.context.rawContext.currentTime)
+  const startAt = Tone.context.rawContext.currentTime + whenSec;
   const src = Tone.context.rawContext.createBufferSource();
   src.buffer = buf;
   src.connect(Tone.context.rawContext.destination);
-  src.start();
-  layers.forEach(L => {
-    if (L.isRecording) {
-      const t = performance.now() - L.recStartTime;
-      L.events.push({ time: t, type: 'drum', value: fname });
-    }
-  });
+  src.start(startAt);
 }
 
 /* ---------------- Render Grid per page ---------------- */
 function renderGrid(){
   padGrid.innerHTML = '';
   const pages = totalPagesForMode();
-  // clamp currentPage
   if (currentPage < 0) currentPage = 0;
   if (currentPage >= pages) currentPage = pages-1;
-
   pageIndicator.textContent = `Page ${currentPage+1}`;
 
-  // generate pads for page
   if (mode === 'note') {
-    // choose a range of notes — we'll map pages to contiguous chromatic notes
-    // totalNotes chosen earlier; start note = baseMidi - (some offset to get range)
-    const totalNotes = 72; // from C2..B7 maybe
-    const globalStart = baseMidi - 12; // offset so pages include lower octaves too
+    const totalNotes = 72;
+    const globalStart = baseMidi - 12;
     const startIndex = currentPage * padsPerPage;
     for (let i=0;i<padsPerPage;i++){
       const globalIdx = startIndex + i;
@@ -263,7 +235,7 @@ function renderGrid(){
       const note = midiToNote(midi);
       const btn = document.createElement('button');
       btn.className = 'pad note';
-      btn.innerText = note;
+      btn.innerHTML = `<div class="label">${note}</div>`;
       btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playNote(note); };
       padGrid.appendChild(btn);
     }
@@ -271,15 +243,14 @@ function renderGrid(){
     const start = currentPage * padsPerPage;
     for (let i=0;i<padsPerPage;i++){
       const idx = start + i;
-      const chordName = chordBank[idx % chordBank.length] || chordBank[idx % chordBank.length];
+      const chordName = chordBank[idx % chordBank.length];
       const btn = document.createElement('button');
       btn.className = 'pad chord';
-      btn.innerText = chordName;
+      btn.innerHTML = `<div class="label">${chordName}</div>`;
       btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playChordName(chordName); };
       padGrid.appendChild(btn);
     }
   } else { // drum
-    // map drumKit into pages; if drumKit < padsPerPage, repeat sample order
     const start = currentPage * padsPerPage;
     for (let i=0;i<padsPerPage;i++){
       const idx = (start + i) % drumKit.length;
@@ -287,7 +258,8 @@ function renderGrid(){
       const label = filename.replace(/\.[^/.]+$/, "");
       const btn = document.createElement('button');
       btn.className = 'pad drum';
-      btn.innerText = label;
+      // label can be long — allow wrap into two lines
+      btn.innerHTML = `<div class="label">${label}</div>`;
       btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playDrumByFilename(filename); };
       padGrid.appendChild(btn);
     }
@@ -314,7 +286,8 @@ function addLayer(){
     isPlaying: false,
     recStartTime: 0,
     loopLengthMs: 0,
-    timers: []
+    timers: [],
+    msg: ''
   };
   layers.push(layer);
   renderLayers();
@@ -332,6 +305,7 @@ function renderLayers(){
         <div style="display:flex;gap:12px;align-items:center;">
           <div style="font-weight:700">${L.name}</div>
           <div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
+          ${L.msg ? `<div class="msg" id="${L.id}-msg">${L.msg}</div>` : ''}
         </div>
         <div class="muted small">Loop: <span id="${L.id}-loop">—</span></div>
       </div>
@@ -376,6 +350,7 @@ function startRecord(L){
   L.events = [];
   L.isRecording = true;
   L.recStartTime = performance.now();
+  L.msg = '';
   setLoopLabel(L, 'recording…');
   renderLayers();
 }
@@ -384,18 +359,21 @@ function stopRecord(L){
   if (L.events.length > 0){
     const last = L.events[L.events.length - 1].time;
     L.loopLengthMs = Math.max(1000, last + 500);
-  } else {
-    L.loopLengthMs = 0;
-  }
+  } else L.loopLengthMs = 0;
   setLoopLabel(L, L.loopLengthMs ? (Math.round(L.loopLengthMs)/1000 + 's') : '—');
   renderLayers();
 }
 
-/* Playback scheduling */
+/* Playback scheduling — use Tone.now() scheduling for accuracy */
 function startPlay(L){
-  if (L.events.length === 0){ alert('Layer kosong.'); return; }
+  if (L.events.length === 0){
+    L.msg = 'Layer kosong';
+    renderLayers();
+    return;
+  }
   if (L.isPlaying) return;
   L.isPlaying = true;
+  L.msg = '';
   scheduleLayer(L);
   renderLayers();
 }
@@ -408,19 +386,32 @@ function stopPlay(L){
 function scheduleLayer(L){
   clearScheduled(L);
   const loopMs = L.loopLengthMs || (L.events[L.events.length-1].time + 500);
-  const t0 = performance.now();
+  const baseAudioTime = Tone.now();
+  // schedule events immediately via Tone context (accurate)
   for (const ev of L.events){
-    const delay = Math.max(0, ev.time - (performance.now() - t0));
-    const h = setTimeout(() => {
-      // trigger event (note/chord/drum)
-      if (ev.type === 'note') playNote(ev.value, 0, ev.dur ?? 0.25);
-      if (ev.type === 'chord') playChordName(ev.value, 0, ev.dur ?? 1.0);
-      if (ev.type === 'drum') playDrumByFilename(ev.value);
-      // visual flash optional: find pad with matching label on current page? skip visual for scheduled playback
-    }, delay);
-    L.timers.push(h);
+    const evSec = ev.time / 1000;
+    if (ev.type === 'note') {
+      try { synth.triggerAttackRelease(ev.value, (ev.dur ?? 0.25) + "s", baseAudioTime + evSec); }
+      catch(e){ console.warn('play note schedule fail', e); }
+    } else if (ev.type === 'chord') {
+      const notes = getChordNotes(ev.value);
+      if (notes) synth.triggerAttackRelease(notes, (ev.dur ?? 1.0) + "s", baseAudioTime + evSec);
+      else {
+        try { synth.triggerAttackRelease(ev.value, (ev.dur ?? 1.0) + "s", baseAudioTime + evSec); }
+        catch(e){ console.warn('unknown chord during schedule', ev.value); }
+      }
+    } else if (ev.type === 'drum') {
+      const buf = drumBuffers[ev.value];
+      if (buf){
+        const src = Tone.context.rawContext.createBufferSource();
+        src.buffer = buf;
+        src.connect(Tone.context.rawContext.destination);
+        src.start(Tone.context.rawContext.currentTime + evSec);
+      } // if missing, skip sound but event logic already recorded
+    }
   }
-  // loop reschedule
+
+  // push a single loop timeout to re-run schedule
   const loopHandle = setTimeout(() => {
     if (L.isPlaying) scheduleLayer(L);
   }, loopMs);
@@ -437,6 +428,7 @@ function clearLayer(L){
   stopPlay(L);
   L.events = [];
   L.loopLengthMs = 0;
+  L.msg = '';
   setLoopLabel(L, '—');
   renderLayers();
 }
@@ -452,7 +444,7 @@ function setLoopLabel(L, txt){
   if (el) el.textContent = txt;
 }
 
-/* ---------------- Keyboard (map small subset) ---------------- */
+/* ---------------- Keyboard small mapping ---------------- */
 const keyMap = ['z','x','c','v','b','n','m','q','w','e','r','t','y','u','i','o'];
 window.addEventListener('keydown', async (ev) => {
   if (ev.repeat) return;
