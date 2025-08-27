@@ -1,190 +1,346 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Web Launchpad - Note Grid</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Web Launchpad – Stable</title>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
   <style>
-    body { font-family: sans-serif; background: #111; color: #fff; text-align: center; }
-    .grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 8px; justify-content: center; margin-top: 20px; }
-    button { padding: 20px; font-size: 14px; border: none; border-radius: 8px; background: #333; color: #fff; cursor: pointer; }
-    button:active { background: #555; }
-    .layer { margin: 10px auto; padding: 10px; border: 1px solid #444; border-radius: 8px; width: 350px; }
-    .controls { margin-top: 5px; }
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0f1115; color:#e9eef5; }
+    header { display:flex; gap:8px; align-items:center; justify-content:center; padding:14px 10px; position:sticky; top:0; background:#0f1115cc; backdrop-filter: blur(6px); border-bottom:1px solid #202534; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; }
+    .grid { display:grid; grid-template-columns: repeat(4, minmax(72px, 1fr)); gap:10px; width:min(420px, 92vw); margin:16px auto; }
+    .btn { padding:10px 12px; border:1px solid #283043; background:#161a24; color:#e9eef5; border-radius:10px; cursor:pointer; transition:transform .02s ease, background .2s ease, border .2s ease; }
+    .btn:hover { background:#1b2130; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background:#1f5eff; border-color:#2a66ff; }
+    .btn.danger  { background:#3a1520; border-color:#6b1e31; }
+    .btn.success { background:#19532e; border-color:#216f3f; }
+    .btn.warn    { background:#4a3a15; border-color:#6f5621; }
+    .pad { padding:18px 10px; text-align:center; font-weight:600; border-radius:12px; user-select:none; }
+    .pad:active { filter: brightness(1.15); }
+    .pad.note  { background:#1a2030; border:1px solid #2b3857; }
+    .pad.chord { background:#212028; border:1px solid #3a3850; }
+    .section { width:min(780px, 96vw); margin: 8px auto 24px; }
+    .layer { border:1px solid #27304a; background:#141a26; border-radius:12px; padding:12px; margin:10px 0; }
+    .layer header { display:flex; gap:10px; align-items:center; justify-content:space-between; position:static; background:transparent; border:none; padding:0 0 8px 0; }
+    .layer .name { font-weight:700; }
+    .muted { opacity:.7; font-size:.9em; }
+    .pill { padding:4px 8px; border-radius:999px; border:1px solid #283043; }
+    .row.wrap { flex-wrap:wrap; }
+    .spacer { flex:1; }
+    .small { font-size:.92em; }
   </style>
 </head>
 <body>
-  <h1>Web Launchpad (Note Grid)</h1>
-  <button onclick="toggleMode()">Switch Note/Chord</button>
-  <div class="grid" id="padGrid"></div>
 
-  <h2>Layers</h2>
-  <div id="layers"></div>
-  <button onclick="addLayer()">+ Add Layer</button>
+  <header>
+    <button id="unlockBtn" class="btn success">🔊 Enable Audio</button>
+    <div class="spacer"></div>
+    <button id="modeBtn" class="btn">Mode: Note</button>
+    <div class="row">
+      <label class="muted small">Octave</label>
+      <button id="octDown" class="btn">−</button>
+      <span id="octLabel" class="pill">C3</span>
+      <button id="octUp" class="btn">+</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div id="padGrid" class="grid"></div>
+    </section>
+
+    <section class="section">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <h2 style="margin:0">Layers</h2>
+        <button id="addLayerBtn" class="btn primary">+ Add Layer</button>
+      </div>
+      <div id="layersWrap"></div>
+    </section>
+  </main>
 
 <script>
-const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-let isNoteMode = true;
-let startNoteIndex = 48; // C3 (MIDI 48)
+/* ========= Audio setup ========= */
+const synth = new Tone.PolySynth(Tone.Synth, {
+  maxPolyphony: 32,
+  options: { envelope: { attack: 0.005, decay: 0.2, sustain: 0.4, release: 0.8 } }
+}).toDestination();
 
-// Scale notes untuk grid
-const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-function midiToNote(midi) {
-  const octave = Math.floor(midi/12) - 1;
-  const name = noteNames[midi % 12];
-  return name + octave;
-}
+let audioEnabled = false;
+document.getElementById('unlockBtn').addEventListener('click', async () => {
+  try {
+    await Tone.start();
+    audioEnabled = true;
+    document.getElementById('unlockBtn').textContent = '✅ Audio Enabled';
+    document.getElementById('unlockBtn').disabled = true;
+  } catch (e) {
+    alert('Failed to enable audio: ' + e.message);
+  }
+});
 
-// Chord bank
+/* ========= Helpers ========= */
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const midiToNote = (midi) => `${NOTE_NAMES[midi % 12]}${Math.floor(midi/12)-1}`;
+
+function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+/* ========= Grid (Note/Chord) ========= */
+let mode = 'note'; // 'note' | 'chord'
+let baseMidi = 48; // C3
+const gridSize = 16; // 4x4
 const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7"];
+
 function getChordNotes(chord) {
   const map = {
     "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"],
-    "F":["F4","A4","C5"], "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"],
-    "C7":["C4","E4","G4","A#4"]
+    "F":["F4","A4","C5"], "G":["G4","B4","D5"], "Am":["A4","C5","E5"],
+    "Bdim":["B4","D5","F5"], "C7":["C4","E4","G4","A#4"]
   };
   return map[chord] || ["C4"];
 }
 
-function buildPads() {
-  const grid = document.getElementById("padGrid");
-  grid.innerHTML = "";
-  if (isNoteMode) {
-    for (let i=0; i<16; i++) {
-      const note = midiToNote(startNoteIndex + i);
-      const btn = document.createElement("button");
-      btn.innerText = note;
+function renderGrid(){
+  const grid = document.getElementById('padGrid');
+  grid.innerHTML = '';
+  if (mode === 'note'){
+    for (let i=0;i<gridSize;i++){
+      const note = midiToNote(baseMidi + i);
+      const btn = document.createElement('button');
+      btn.className = 'btn pad note';
+      btn.textContent = note;
       btn.onclick = () => playNote(note);
       grid.appendChild(btn);
     }
   } else {
     chordBank.forEach(ch => {
-      const btn = document.createElement("button");
-      btn.innerText = ch;
+      const btn = document.createElement('button');
+      btn.className = 'btn pad chord';
+      btn.textContent = ch;
       btn.onclick = () => playChord(ch);
       grid.appendChild(btn);
     });
+    // Fill to 16 for a tidy grid
+    for (let i=chordBank.length;i<gridSize;i++){
+      const s = document.createElement('div'); s.style.visibility='hidden';
+      grid.appendChild(s);
+    }
   }
 }
-buildPads();
+renderGrid();
 
-function toggleMode() {
-  isNoteMode = !isNoteMode;
-  buildPads();
+document.getElementById('modeBtn').addEventListener('click', () => {
+  mode = (mode === 'note') ? 'chord' : 'note';
+  document.getElementById('modeBtn').textContent = `Mode: ${mode === 'note' ? 'Note' : 'Chord'}`;
+  renderGrid();
+});
+
+function updateOctLabel(){
+  document.getElementById('octLabel').textContent = midiToNote(baseMidi);
 }
+updateOctLabel();
 
-function playNote(note) {
-  const now = Tone.now();
-  synth.triggerAttackRelease(note, "8n", now);
-  layers.forEach(layer => {
-    if (layer.isRecording) {
-      layer.events.push({time: now - layer.startTime, type:"note", value: note});
+document.getElementById('octDown').addEventListener('click', () => {
+  baseMidi = clamp(baseMidi - 12, 24, 84); // bounds: C2..C7
+  updateOctLabel();
+  if (mode==='note') renderGrid();
+});
+document.getElementById('octUp').addEventListener('click', () => {
+  baseMidi = clamp(baseMidi + 12, 24, 84);
+  updateOctLabel();
+  if (mode==='note') renderGrid();
+});
+
+/* ========= Play (and record capture) ========= */
+function playNote(note, whenSec = 0.0, dur = 0.25){
+  if (!audioEnabled) return;
+  // schedule at now + whenSec
+  synth.triggerAttackRelease(note, dur + "s", Tone.now() + whenSec);
+  // if recording, store this press with real-time clock
+  layers.forEach(L => {
+    if (L.isRecording){
+      const t = performance.now() - L.recStartTime;
+      L.events.push({ time: t, type: 'note', value: note, dur });
     }
   });
 }
 
-function playChord(chord) {
-  const now = Tone.now();
+function playChord(chord, whenSec = 0.0, dur = 1.0){
+  if (!audioEnabled) return;
   const notes = getChordNotes(chord);
-  synth.triggerAttackRelease(notes, "1n", now);
-  layers.forEach(layer => {
-    if (layer.isRecording) {
-      layer.events.push({time: now - layer.startTime, type:"chord", value: chord});
+  synth.triggerAttackRelease(notes, dur + "s", Tone.now() + whenSec);
+  layers.forEach(L => {
+    if (L.isRecording){
+      const t = performance.now() - L.recStartTime;
+      L.events.push({ time: t, type: 'chord', value: chord, dur });
     }
   });
 }
 
-// ================= Layers ==================
-let layers = [];
-let layerCounter = 0; // unique ID counter
+/* ========= Layers (Unlimited) ========= */
+let layers = [];           // array of layer objects
+let idCounter = 0;
 
-function addLayer() {
-  const idx = layers.length;
-  const layerId = "layer-" + (++layerCounter);
-  const layer = { id: layerId, events: [], isRecording: false, isPlaying: false, loopId: null, startTime: 0 };
+const layersWrap = document.getElementById('layersWrap');
+document.getElementById('addLayerBtn').addEventListener('click', addLayer);
+
+function addLayer(){
+  const id = `L${++idCounter}`;
+  const layer = {
+    id,
+    name: `Layer ${layers.length+1}`,
+    events: [],
+    isRecording: false,
+    isPlaying: false,
+    recStartTime: 0,
+    loopLengthMs: 0,
+    timers: [] // for setTimeout handles
+  };
   layers.push(layer);
-
-  const div = document.createElement("div");
-  div.className = "layer";
-  div.id = layerId;
-  div.innerHTML = `<b>Layer ${idx+1}</b>
-    <div class="controls">
-      <button onclick="recordLayer('${layerId}')">Record</button>
-      <button onclick="stopRecord('${layerId}')">Stop</button>
-      <button onclick="playLayer('${layerId}')">Play</button>
-      <button onclick="stopLayer('${layerId}')">Stop Play</button>
-      <button onclick="clearLayer('${layerId}')">Clear</button>
-      <button onclick="deleteLayer('${layerId}')">Delete</button>
-    </div>`;
-  document.getElementById("layers").appendChild(div);
+  renderLayers();
 }
 
-function getLayerById(id) {
-  return layers.find(l => l && l.id === id);
+function renderLayers(){
+  layersWrap.innerHTML = '';
+  layers.forEach((L, idx) => {
+    const el = document.createElement('div');
+    el.className = 'layer';
+    el.id = L.id;
+    el.innerHTML = `
+      <header>
+        <div class="name">${L.name}</div>
+        <div class="muted small">${L.events.length} event${L.events.length!==1?'s':''}</div>
+      </header>
+      <div class="row wrap">
+        <button class="btn success" data-act="record" data-id="${L.id}">● Record</button>
+        <button class="btn" data-act="stoprec" data-id="${L.id}">■ Stop</button>
+        <button class="btn" data-act="play" data-id="${L.id}">▶ Play</button>
+        <button class="btn" data-act="stopplay" data-id="${L.id}">⏹ Stop Play</button>
+        <button class="btn warn" data-act="clear" data-id="${L.id}">⟲ Clear</button>
+        <button class="btn danger" data-act="delete" data-id="${L.id}">✖ Delete</button>
+        <span class="spacer"></span>
+        <span class="muted small">Loop: <span id="${L.id}-loop">—</span></span>
+      </div>
+    `;
+    layersWrap.appendChild(el);
+  });
 }
 
-function recordLayer(id) {
-  const layer = getLayerById(id);
-  if (!layer) return;
-  layer.events = [];
-  layer.isRecording = true;
-  layer.startTime = Tone.now();
-  alert("Recording " + id);
-}
-function stopRecord(id) {
-  const layer = getLayerById(id);
-  if (layer) layer.isRecording = false;
+/* Delegate layer button actions */
+layersWrap.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const act = btn.getAttribute('data-act');
+  const id  = btn.getAttribute('data-id');
+  const L = layers.find(x => x.id === id);
+  if (!L) return;
+
+  if (act === 'record') startRecord(L);
+  if (act === 'stoprec') stopRecord(L);
+  if (act === 'play') startPlay(L);
+  if (act === 'stopplay') stopPlay(L);
+  if (act === 'clear') clearLayer(L);
+  if (act === 'delete') deleteLayer(L);
+});
+
+/* ----- Recording ----- */
+function startRecord(L){
+  clearScheduled(L);
+  L.events = [];
+  L.isRecording = true;
+  L.recStartTime = performance.now();
+  setLoopLabel(L, 'recording…');
 }
 
-function playLayer(id) {
-  const layer = getLayerById(id);
-  if (!layer || layer.events.length === 0) return alert("No events in " + id);
-  layer.isPlaying = true;
-  const duration = layer.events[layer.events.length-1].time + 2; // loop length
-
-  function schedule() {
-    layer.events.forEach(e => {
-      if (e.type === "note") {
-        synth.triggerAttackRelease(e.value, "8n", Tone.now() + e.time);
-      }
-      if (e.type === "chord") {
-        const notes = getChordNotes(e.value);
-        synth.triggerAttackRelease(notes, "1n", Tone.now() + e.time);
-      }
-    });
+function stopRecord(L){
+  L.isRecording = false;
+  // Compute loop length from last event + a small tail (500ms)
+  if (L.events.length > 0){
+    const lastT = L.events[L.events.length - 1].time;
+    L.loopLengthMs = Math.max(1000, lastT + 500);
+  } else {
+    L.loopLengthMs = 0;
   }
-  schedule();
-  layer.loopId = setInterval(schedule, duration*1000);
+  setLoopLabel(L, L.loopLengthMs ? (Math.round(L.loopLengthMs)/1000 + 's') : '—');
 }
 
-function stopLayer(id) {
-  const layer = getLayerById(id);
-  if (layer && layer.loopId) {
-    clearInterval(layer.loopId);
-    layer.isPlaying = false;
+/* ----- Playback (scheduled precisely) ----- */
+function startPlay(L){
+  if (L.events.length === 0){
+    alert('Layer kosong.');
+    return;
   }
+  if (L.isPlaying) return;
+  L.isPlaying = true;
+  scheduleLayer(L);
 }
 
-function clearLayer(id) {
-  const layer = getLayerById(id);
-  if (layer) {
-    stopLayer(id);
-    layer.events = [];
-    alert(id + " cleared");
+function stopPlay(L){
+  L.isPlaying = false;
+  clearScheduled(L);
+}
+
+function scheduleLayer(L){
+  clearScheduled(L);
+  const loopMs = L.loopLengthMs || (L.events[L.events.length-1].time + 500);
+  const t0 = performance.now();
+  // schedule all events for one loop
+  for (const ev of L.events){
+    const delay = Math.max(0, ev.time - (performance.now() - t0));
+    const h = setTimeout(() => {
+      const whenSec = 0; // trigger immediately when timeout fires
+      if (ev.type === 'note')  playNote(ev.value, whenSec, ev.dur ?? 0.25);
+      if (ev.type === 'chord') playChord(ev.value, whenSec, ev.dur ?? 1.0);
+    }, delay);
+    L.timers.push(h);
   }
+  // reschedule the loop if still playing
+  const loopHandle = setTimeout(() => {
+    if (L.isPlaying) scheduleLayer(L);
+  }, loopMs);
+  L.timers.push(loopHandle);
 }
 
-function deleteLayer(id) {
-  const layer = getLayerById(id);
-  if (!layer) return;
-  stopLayer(id);
-  // buang dari array
-  layers = layers.filter(l => l && l.id !== id);
-  // buang UI
-  const div = document.getElementById(id);
-  if (div) div.remove();
+function clearScheduled(L){
+  L.timers.forEach(h => clearTimeout(h));
+  L.timers = [];
 }
+
+/* ----- Utilities for layers ----- */
+function clearLayer(L){
+  stopPlay(L);
+  L.events = [];
+  L.loopLengthMs = 0;
+  setLoopLabel(L, '—');
+  renderLayers();
+}
+
+function deleteLayer(L){
+  stopPlay(L);
+  layers = layers.filter(x => x.id !== L.id);
+  renderLayers();
+}
+
+function setLoopLabel(L, txt){
+  const el = document.getElementById(`${L.id}-loop`);
+  if (el) el.textContent = txt;
+}
+
+/* ========= Keyboard support (optional simple) =========
+   Row:       Z X C V   A S D F   Q W E R   1 2 3 4
+   Maps to:   16 pads sequentially (note mode only)
+*/
+const keyMap = ['z','x','c','v','a','s','d','f','q','w','e','r','1','2','3','4'];
+window.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  const idx = keyMap.indexOf(k);
+  if (idx >= 0 && mode === 'note'){
+    const note = midiToNote(baseMidi + idx);
+    playNote(note);
+  }
+});
 </script>
-
 </body>
 </html>
