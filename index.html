@@ -11,7 +11,11 @@
     header { padding:12px; border-bottom:1px solid #1f2736; display:flex; flex-direction:column; gap:8px; align-items:center; position:sticky; top:0; background:#0d1014cc; z-index:20; }
     .top-row { width:100%; max-width:980px; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
     /* increased gap so Mode and Octave aren't too close */
-    .controls { display:flex; gap:32px; align-items:center; }
+    .controls {
+      display:flex;
+      gap:42px;        /* asal 16px → sekarang 32px */
+      align-items:center;
+    }
     .modeBtn, .btn, .pageBtn, .small-input { padding:8px 10px; border-radius:10px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; cursor:pointer; }
     .modeBtn.primary { background:#1f5eff; border-color:#2a66ff; }
     .small { font-size:0.92rem; color:#c7d1e6; }
