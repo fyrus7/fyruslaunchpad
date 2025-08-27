@@ -1,493 +1,142 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Launchpad</title>
-  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif; background:#0d1014; color:#eaf0fb; }
-    header { padding:12px; border-bottom:1px solid #1f2736; display:flex; flex-direction:column; gap:8px; align-items:center; position:sticky; top:0; background:#0d1014cc; z-index:20; }
-    .top-row { width:100%; max-width:980px; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
-    /* increased gap so Mode and Octave aren't too close */
-    .controls {
-      display:flex;
-      gap:42px;        /* asal 16px → sekarang 32px */
-      align-items:center;
-    }
-    .modeBtn, .btn, .pageBtn, .small-input { padding:8px 10px; border-radius:10px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; cursor:pointer; }
-    .modeBtn.primary { background:#1f5eff; border-color:#2a66ff; }
-    .small { font-size:0.92rem; color:#c7d1e6; }
-    .pill { padding:6px 10px; border-radius:999px; border:1px solid #2a3445; background:#0f1419; }
-    .page-row { width:100%; max-width:980px; margin-top:6px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
-
-    main { padding:12px; display:flex; flex-direction:column; align-items:center; gap:14px; }
-
-    /* GRID 5x6, pads are square */
-    #padGrid { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width:min(760px, 96vw); }
-    .pad {
-      display:flex; align-items:center; justify-content:center; border-radius:10px;
-      font-weight:700; background:#151922; border:1px solid #263044; color:#eaf0fb;
-      user-select:none; touch-action:manipulation; padding:6px;
-      aspect-ratio: 1 / 1; /* make truly square */
-      min-width:46px; min-height:46px;
-    }
-    .pad .label { white-space:normal; text-align:center; line-height:1.02; font-size:13px; word-break:break-word; }
-    .pad:active { transform: translateY(1px); filter:brightness(1.12); }
-    .pad.flash { box-shadow:0 0 12px rgba(255,160,50,.12); background: linear-gradient(180deg,#26323f,#1a232c); }
-    .pad.note { background:linear-gradient(180deg,#12161b,#0f1418); }
-    .pad.chord { background:linear-gradient(180deg,#162026,#11161b); }
-    .pad.drum { background:linear-gradient(180deg,#251419,#1b0f12); }
-
-    #layersWrap { width:min(980px,96vw); display:flex; flex-direction:column; gap:8px; }
-    .layer { border-radius:10px; padding:10px; background:#0f1419; border:1px solid #222a38; display:flex; flex-direction:column; gap:8px; }
-    .layer .top { display:flex; gap:8px; align-items:center; justify-content:space-between; }
-    .layer .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .layer button { padding:8px 10px; border-radius:8px; border:1px solid #263044; background:#12161b; color:#eaf0fb; cursor:pointer; }
-    .layer button.recording { background:#b52020 !important; color:#fff; animation: blink 1s infinite; border-color:#8f1a1a; }
-    .layer button.activeRec { background:#1fa02b !important; color:#fff; border-color:#16761b; }
-    @keyframes blink { 0%,50%,100%{opacity:1} 25%,75%{opacity:.5} }
-    .muted { color:#9aa6c7; font-size:.92rem; }
-    .msg { color:#f2c94c; font-weight:600; margin-left:6px; }
-    footer { height:60px; }
-
-    /* responsive tweaks */
-    @media (max-width:420px){
-      .pad .label { font-size:12px; }
-      .pad { min-height:54px; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fyrus Launchpad</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
+<style>
+:root { color-scheme: dark; }
+body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,sans-serif; background:#0d1014; color:#eaf0fb; }
+header { padding:12px; border-bottom:1px solid #1f2736; display:flex; flex-direction:column; gap:8px; align-items:center; position:sticky; top:0; background:#0d1014cc; z-index:20; }
+.top-row { width:100%; max-width:980px; display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.controls { display:flex; gap:16px; align-items:center; }
+.modeBtn, .btn, .pageBtn, .small-input { padding:8px 10px; border-radius:10px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; cursor:pointer; }
+.modeBtn.primary { background:#1f5eff; border-color:#2a66ff; }
+.small { font-size:0.92rem; color:#c7d1e6; }
+.pill { padding:6px 10px; border-radius:999px; border:1px solid #2a3445; background:#0f1419; }
+.page-row { width:100%; max-width:980px; margin-top:6px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap; }
+main { padding:12px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+/* GRID 5x6, pads are square */
+#padGrid { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; width:min(760px, 96vw); }
+.pad { display:flex; align-items:center; justify-content:center; border-radius:10px; font-weight:700; background:#151922; border:1px solid #263044; color:#eaf0fb; user-select:none; touch-action:manipulation; padding:6px; aspect-ratio:1/1; min-width:46px; min-height:46px; transition: transform 0.08s, box-shadow 0.08s, background 0.08s; }
+.pad .label { white-space:normal; text-align:center; line-height:1.02; font-size:13px; word-break:break-word; }
+.pad:active { transform: translateY(1px); filter:brightness(1.12); }
+.pad.flash { box-shadow:0 0 12px rgba(50,120,255,.6); transform: scale(1.1); background: linear-gradient(180deg,#26323f,#1a232c); }
+.pad.note { background:linear-gradient(180deg,#12161b,#0f1418); }
+.pad.chord { background:linear-gradient(180deg,#162026,#11161b); }
+.pad.drum { background:linear-gradient(180deg,#251419,#1b0f12); }
+#layersWrap { width:min(980px,96vw); display:flex; flex-direction:column; gap:8px; }
+.layer { border-radius:10px; padding:10px; background:#0f1419; border:1px solid #222a38; display:flex; flex-direction:column; gap:8px; }
+.layer .top { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+.layer .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.layer button { padding:8px 10px; border-radius:8px; border:1px solid #263044; background:#12161b; color:#eaf0fb; cursor:pointer; }
+.layer button.recording { background:#b52020 !important; color:#fff; animation: blink 1s infinite; border-color:#8f1a1a; }
+.layer button.activeRec { background:#1fa02b !important; color:#fff; border-color:#16761b; }
+@keyframes blink {0%,50%,100%{opacity:1} 25%,75%{opacity:.5}}
+.muted { color:#9aa6c7; font-size:.92rem; }
+.msg { color:#f2c94c; font-weight:600; margin-left:6px; }
+footer { height:60px; }
+/* responsive tweaks */
+@media (max-width:420px){ .pad .label { font-size:12px; } .pad { min-height:54px; } }
+</style>
 </head>
 <body>
-
-  <header>
-    <div class="top-row">
-      <div class="controls">
-        <button id="modeBtn" class="modeBtn">Mode: Note</button>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="small muted">Octave</span>
-          <button id="octDown" class="btn">−</button>
-          <span id="octLabel" class="pill">C3</span>
-          <button id="octUp" class="btn">+</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="page-row">
-      <div class="pager">
-        <button id="prevPage" class="pageBtn">⬅ Prev</button>
-        <span id="pageIndicator" class="pill">Page 1</span>
-        <button id="nextPage" class="pageBtn">Next ➡</button>
-      </div>
-      <div style="width:12px"></div>
-      <button id="addLayerBtn" class="modeBtn primary">+ Add Layer</button>
-    </div>
-  </header>
-
-  <main>
-    <div id="padGrid" role="grid" aria-label="Launchpad grid"></div>
-
-    <section style="width:min(980px,96vw);">
-      <h3 style="margin:6px 0 8px 0">Layers</h3>
-      <div id="layersWrap"></div>
-    </section>
-  </main>
-
-  <footer></footer>
-
+<header>
+<div class="top-row">
+<div class="controls">
+<button id="modeBtn" class="modeBtn">Mode: Note</button>
+<div style="display:flex;align-items:center;gap:8px;">
+<span class="small muted">Octave</span>
+<button id="octDown" class="btn">−</button>
+<span id="octLabel" class="pill">C3</span>
+<button id="octUp" class="btn">+</button>
+</div>
+<div style="display:flex;align-items:center;gap:8px;margin-left:12px;">
+<button id="metronomeBtn" class="btn">Metronome: OFF</button>
+<input type="number" id="bpmInput" value="120" min="30" max="300" style="width:60px; border-radius:6px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; padding:4px;">
+</div>
+</div>
+</div>
+<div class="page-row">
+<div class="pager">
+<button id="prevPage" class="pageBtn">⬅ Prev</button>
+<span id="pageIndicator" class="pill">Page 1</span>
+<button id="nextPage" class="pageBtn">Next ➡</button>
+</div>
+<div style="width:12px"></div>
+<button id="addLayerBtn" class="modeBtn primary">+ Add Layer</button>
+</div>
+</header>
+<main>
+<div id="padGrid" role="grid" aria-label="Launchpad grid"></div>
+<section style="width:min(980px,96vw);">
+<h3 style="margin:6px 0 8px 0">Layers</h3>
+<div id="layersWrap"></div>
+</section>
+</main>
+<footer></footer>
 <script>
-/* ========== Tone setup ========== */
-const synth = new Tone.PolySynth(Tone.Synth, {
-  maxPolyphony: 32,
-  options: { envelope: { attack: 0.005, decay: 0.18, sustain: 0.38, release: 0.5 } }
-}).toDestination();
+/* ---------- Tone setup ---------- */
+const synth = new Tone.PolySynth(Tone.Synth,{maxPolyphony:32, options:{envelope:{attack:0.005,decay:0.18,sustain:0.38,release:0.5}}}).toDestination();
+/* pre-create a gain node to reduce startup delay */
+const drumPlayers = {};
+const drumFiles=['kick.wav','snare.wav','hihat-closed.wav','hihat-open-1.wav','clap-1.wav','rim.wav','tom-l.wav','tom-h.wav','ride.wav','cymbal.wav','kick-short.wav','hihat-open-2.wav','clap-2.wav','tom-h.wav','snare.wav','rim.wav'];
+const drumBase='https://oramics.github.io/sampled/DM/TR-909/Detroit/samples/';
+for(const f of drumFiles){ const p=new Tone.Player({url:drumBase+f, autostart:false}).toDestination(); p.sync(); drumPlayers[f]=p; }
 
-/* ========== Config ========== */
-const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const midiToNote = (m) => `${NOTE_NAMES[m % 12]}${Math.floor(m/12)-1}`;
+/* ---------- Config ---------- */
+const NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const midiToNote=(m)=>`${NOTE_NAMES[m%12]}${Math.floor(m/12)-1}`;
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-
-let mode = 'note'; // 'note' | 'chord' | 'drum'
-let baseMidi = 48; // C3
-const cols = 5, rows = 6;
-const padsPerPage = cols * rows; // 30
-let currentPage = 0;
-
-/* ---------- CHORD MODE: only these chords (fixed) ---------- */
-const chordModeList = ["C","Dm","Em","F","G","Am","Bdim","C7"];
-const chordMap = {
-  "C":["C4","E4","G4"],
-  "Dm":["D4","F4","A4"],
-  "Em":["E4","G4","B4"],
-  "F":["F4","A4","C5"],
-  "G":["G4","B4","D5"],
-  "Am":["A4","C5","E5"],
-  "Bdim":["B4","D5","F5"],
-  "C7":["C4","E4","G4","A#4"]
-};
-
-/* ---------- DRUMS: public URLs (fixed) ---------- */
-const drumBase = 'https://oramics.github.io/sampled/DM/TR-909/Detroit/samples/';
-const drumFiles = [
-  'kick.wav','snare.wav','hihat-closed.wav','hihat-open-1.wav',
-  'clap-1.wav','rim.wav','tom-l.wav','tom-h.wav',
-  'ride.wav','cymbal.wav','kick-short.wav','hihat-open-2.wav',
-  'clap-2.wav','tom-h.wav','snare.wav','rim.wav'
-];
-
-const drumPlayers = {}; // filename -> Tone.Player
-
-async function loadDrumPlayers(){
-  for (const f of drumFiles){
-    const url = drumBase + f;
-    try {
-      const p = new Tone.Player({ url, autostart:false }).toDestination();
-      // do NOT sync to Transport (so immediate start works)
-      drumPlayers[f] = p;
-      // loading starts automatically
-    } catch(e){
-      console.warn('Failed to create player', f, e);
-    }
-  }
-  console.log('drum players created (public URLs) — using', drumBase);
-}
-loadDrumPlayers();
-
-/* ========== DOM refs ========== */
-const padGrid = document.getElementById('padGrid');
-const pageIndicator = document.getElementById('pageIndicator');
-const modeBtn = document.getElementById('modeBtn');
-const octLabel = document.getElementById('octLabel');
-const octDown = document.getElementById('octDown');
-const octUp = document.getElementById('octUp');
-const prevPageBtn = document.getElementById('prevPage');
-const nextPageBtn = document.getElementById('nextPage');
-const addLayerBtn = document.getElementById('addLayerBtn');
-
-function updateOctLabel(){ octLabel.textContent = midiToNote(baseMidi); }
+let mode='note';
+let baseMidi=48; const cols=5, rows=6; const padsPerPage=cols*rows; let currentPage=0;
+const chordBank=["C","Dm","Em","F","G","Am","Bdim","C7"];
+/* ---------- DOM ---------- */
+const padGrid=document.getElementById('padGrid'); const pageIndicator=document.getElementById('pageIndicator');
+const modeBtn=document.getElementById('modeBtn'); const octLabel=document.getElementById('octLabel');
+const octDown=document.getElementById('octDown'); const octUp=document.getElementById('octUp');
+const prevPageBtn=document.getElementById('prevPage'); const nextPageBtn=document.getElementById('nextPage');
+const addLayerBtn=document.getElementById('addLayerBtn');
+const metronomeBtn=document.getElementById('metronomeBtn'); const bpmInput=document.getElementById('bpmInput');
+function updateOctLabel(){octLabel.textContent=midiToNote(baseMidi);}
 updateOctLabel();
+octDown.addEventListener('click',()=>{baseMidi=clamp(baseMidi-12,24,84);updateOctLabel(); renderGrid();});
+octUp.addEventListener('click',()=>{baseMidi=clamp(baseMidi+12,24,84);updateOctLabel(); renderGrid();});
+modeBtn.addEventListener('click',()=>{mode=(mode==='note')?'chord':(mode==='chord'?'drum':'note'); modeBtn.textContent=`Mode: ${mode.charAt(0).toUpperCase()+mode.slice(1)}`; currentPage=0; renderGrid();});
+prevPageBtn.addEventListener('click',()=>{if(currentPage>0) currentPage--;renderGrid();});
+nextPageBtn.addEventListener('click',()=>{if(currentPage<totalPagesForMode()-1) currentPage++;renderGrid();});
+function totalPagesForMode(){return Math.ceil((mode==='note'?72:(mode==='chord'?chordBank.length:drumFiles.length))/padsPerPage);}
 
-octDown.addEventListener('click', ()=> { baseMidi = clamp(baseMidi-12, 24, 84); updateOctLabel(); renderGrid(); });
-octUp.addEventListener('click', ()=> { baseMidi = clamp(baseMidi+12, 24, 84); updateOctLabel(); renderGrid(); });
+/* ---------- Metronome ---------- */
+let metroOn=false; let metroLoop=null;
+const clickSynth = new Tone.MembraneSynth({pitchDecay:0.01,octaves:10,envelope:{attack:0.001,decay:0.1,sustain:0,release:0.1}}).toDestination();
+function startMetronome(){Tone.Transport.stop(); Tone.Transport.cancel(); const bpm=clamp(parseInt(bpmInput.value)||120,30,300); Tone.Transport.bpm.value=bpm; metroLoop = new Tone.Loop((time)=>{clickSynth.triggerAttackRelease("C2","8n",time);}, "4n"); metroLoop.start(0); Tone.Transport.start(); metroOn=true; metronomeBtn.textContent='Metronome: ON';}
+function stopMetronome(){if(metroLoop) metroLoop.stop(); Tone.Transport.stop(); metroOn=false; metronomeBtn.textContent='Metronome: OFF';}
+metronomeBtn.addEventListener('click',async()=>{await Tone.start(); metroOn?stopMetronome():startMetronome();});
 
-modeBtn.addEventListener('click', () => {
-  mode = (mode === 'note') ? 'chord' : (mode === 'chord' ? 'drum' : 'note');
-  modeBtn.textContent = `Mode: ${mode.charAt(0).toUpperCase()+mode.slice(1)}`;
-  currentPage = 0;
-  renderGrid();
-});
+/* ---------- Audio helpers ---------- */
+async function ensureAudioStarted(){try{await Tone.start();}catch{}}
+function flashPad(el){if(!el)return; el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),140);}
+function playNoteImmediate(note){synth.triggerAttackRelease(note,'8n',Tone.now()); flashPad(padMap[note]); recordEvent('note',note);}
+function playChordImmediate(chord){const notes=chordBank.includes(chord)?chord.split(''): [chord]; synth.triggerAttackRelease(notes,'1n',Tone.now()); recordEvent('chord',chord);}
+function playDrumImmediate(fname){const player=drumPlayers[fname]; if(player){player.start();} recordEvent('drum',fname);}
 
-function totalPagesForMode(){
-  if (mode === 'note') { const totalNotes = 72; return Math.ceil(totalNotes / padsPerPage); }
-  if (mode === 'chord') { return Math.ceil(chordModeList.length / padsPerPage); }
-  return Math.ceil(Math.max(drumFiles.length,1) / padsPerPage);
-}
-prevPageBtn.addEventListener('click', ()=>{ if (currentPage>0) currentPage--; renderGrid(); });
-nextPageBtn.addEventListener('click', ()=>{ if (currentPage < totalPagesForMode()-1) currentPage++; renderGrid(); });
+/* ---------- Layers ---------- */
+let layers=[],idCounter=0,layersWrap=document.getElementById('layersWrap');
+function addLayer(){const id=`L${++idCounter}`; const L={id,name:`Layer ${layers.length+1}`,events:[],isRecording:false,isPlaying:false,recStartTime:0,loopLengthMs:0,part:null,msg:''}; layers.push(L); renderLayers();}
+addLayerBtn.addEventListener('click',addLayer);
+function renderLayers(){layersWrap.innerHTML=''; layers.forEach(L=>{ const el=document.createElement('div'); el.className='layer'; el.id=L.id; el.innerHTML=`<div class="top"><div style="display:flex;gap:12px;align-items:center;"><div style="font-weight:700">${L.name}</div><div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>${L.msg?`<div class="msg" id="${L.id}-msg">${L.msg}</div>`:''}</div><div class="muted small">Loop: <span id="${L.id}-loop">—</span></div></div><div class="controls"><button data-layer="${L.id}" class="recordBtn">${L.isRecording?'Stop':'Rec'}</button><button data-layer="${L.id}" class="playBtn" ${L.isPlaying?'disabled':''}>Play</button></div>`; layersWrap.appendChild(el); const recBtn=el.querySelector('.recordBtn'); const playBtn=el.querySelector('.playBtn'); recBtn.addEventListener('click',()=>toggleRecord(L.id,recBtn,playBtn)); playBtn.addEventListener('click',()=>playLayer(L.id));});}
 
-/* ========== Audio helpers ========== */
-async function ensureAudioStarted(){ try{ await Tone.start(); }catch{} }
-function flashPad(el){ if(!el) return; el.classList.add('flash'); setTimeout(()=> el.classList.remove('flash'), 140); }
+/* ---------- Recording ---------- */
+function toggleRecord(id,recBtn,playBtn){const L=layers.find(x=>x.id===id); if(!L)return; if(L.isRecording){L.isRecording=false; recBtn.textContent='Rec'; L.loopLengthMs=Date.now()-L.recStartTime; L.msg=`Recorded ${L.events.length} event${L.events.length!==1?'s':''}`; renderLayers(); }else{L.isRecording=true; recBtn.textContent='Stop'; L.recStartTime=Date.now(); L.events=[]; renderLayers();}}
+function recordEvent(type,val){layers.forEach(L=>{if(L.isRecording){L.events.push({type,val,time:Date.now()-L.recStartTime});}});}
+function playLayer(id){const L=layers.find(x=>x.id===id); if(!L||L.events.length===0)return; L.isPlaying=true; renderLayers(); const start=Tone.now(); for(const ev of L.events){ if(ev.type==='note') synth.triggerAttackRelease(ev.val,'8n',start+ev.time/1000); else if(ev.type==='chord'){const notes=chordBank.includes(ev.val)?ev.val.split(''):[ev.val]; synth.triggerAttackRelease(notes,'1n',start+ev.time/1000);} else if(ev.type==='drum'){const p=drumPlayers[ev.val]; if(p) p.start(start+ev.time/1000);} } setTimeout(()=>{L.isPlaying=false; renderLayers();},L.loopLengthMs);}
 
-/* ========== Play immediate (on-button) ========== */
-function playNoteImmediate(note){
-  synth.triggerAttackRelease(note, '8n', Tone.now());
-  layers.forEach(L => {
-    if (L.isRecording) {
-      let t = performance.now() - L.recStartTime;
-      t = Math.max(0, t);
-      L.events.push({ time: t, type: 'note', value: note, dur: 0.25 });
-      L.msg = '';
-    }
-  });
-}
-
-function playChordImmediate(name){
-  const notes = chordMap[name];
-  if (!notes){
-    console.warn('Attempt to play unknown chord', name);
-    return;
-  }
-  // stop any lingering voices first
-  try { synth.releaseAll(); } catch(e){}
-  synth.triggerAttackRelease(notes, '1n', Tone.now());
-  layers.forEach(L => {
-    if (L.isRecording) {
-      let t = performance.now() - L.recStartTime;
-      t = Math.max(0,t);
-      L.events.push({ time: t, type: 'chord', value: name, dur: 1.0 });
-      L.msg = '';
-    }
-  });
-}
-
-function playDrumImmediate(filename){
-  const player = drumPlayers[filename];
-  layers.forEach(L => { if (L.isRecording){ let t = performance.now() - L.recStartTime; t = Math.max(0,t); L.events.push({ time: t, type: 'drum', value: filename }); L.msg = ''; } });
-  if (player) {
-    try {
-      player.start(); // immediate playback (not synced)
-    } catch(e){
-      console.warn('drum play error', e);
-    }
-  } else {
-    console.warn('drum player not ready for', filename);
-  }
-}
-
-/* ========== Render pads (per page) ========== */
-function renderGrid(){
-  padGrid.innerHTML = '';
-  const pages = totalPagesForMode();
-  if (currentPage < 0) currentPage = 0;
-  if (currentPage >= pages) currentPage = pages-1;
-  pageIndicator.textContent = `Page ${currentPage+1}`;
-
-  if (mode === 'note') {
-    const totalNotes = 72;
-    const globalStart = baseMidi - 12;
-    const startIndex = currentPage * padsPerPage;
-    for (let i=0;i<padsPerPage;i++){
-      const globalIdx = startIndex + i;
-      const midi = globalStart + globalIdx;
-      const note = midiToNote(midi);
-      const btn = document.createElement('button');
-      btn.className = 'pad note';
-      btn.innerHTML = `<div class="label">${note}</div>`;
-      btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playNoteImmediate(note); };
-      padGrid.appendChild(btn);
-    }
-  } else if (mode === 'chord') {
-    // only render chordModeList items; remaining pads invisible placeholders
-    const start = currentPage * padsPerPage;
-    for (let i=0;i<padsPerPage;i++){
-      const idx = start + i;
-      if (idx < chordModeList.length){
-        const chordName = chordModeList[idx];
-        const btn = document.createElement('button');
-        btn.className = 'pad chord';
-        btn.innerHTML = `<div class="label">${chordName}</div>`;
-        btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playChordImmediate(chordName); };
-        padGrid.appendChild(btn);
-      } else {
-        const placeholder = document.createElement('div');
-        placeholder.style.visibility = 'hidden';
-        padGrid.appendChild(placeholder);
-      }
-    }
-  } else { // drum mode
-    const start = currentPage * padsPerPage;
-    for (let i=0;i<padsPerPage;i++){
-      const idx = (start + i) % drumFiles.length;
-      const filename = drumFiles[idx];
-      const label = filename.replace(/\.[^/.]+$/, "").replace(/[_-]/g, ' ');
-      const btn = document.createElement('button');
-      btn.className = 'pad drum';
-      btn.innerHTML = `<div class="label">${label}</div>`;
-      btn.onclick = async () => { await ensureAudioStarted(); flashPad(btn); playDrumImmediate(filename); };
-      padGrid.appendChild(btn);
-    }
-  }
-}
+/* ---------- Grid render ---------- */
+let padMap={};
+function renderGrid(){padGrid.innerHTML=''; padMap={}; const totalPads=padsPerPage; const startIdx=currentPage*padsPerPage; let items=[]; if(mode==='note'){for(let i=0;i<72;i++) items.push(baseMidi+i);} else if(mode==='chord'){items=[...chordBank];} else items=[...drumFiles]; for(let i=0;i<totalPads;i++){const val=items[startIdx+i]; const pad=document.createElement('div'); pad.className='pad '+mode; pad.innerHTML=`<div class="label">${val||''}</div>`; padGrid.appendChild(pad); if(val) padMap[val]=pad; pad.addEventListener('click',async()=>{await ensureAudioStarted(); if(mode==='note') playNoteImmediate(val); else if(mode==='chord') playChordImmediate(val); else playDrumImmediate(val);}); }}
 renderGrid();
-
-/* ========== Layers (Tone.Part scheduling) ========== */
-let layers = [];
-let idCounter = 0;
-const layersWrap = document.getElementById('layersWrap');
-
-addLayerBtn.addEventListener('click', addLayer);
-function addLayer(){
-  const id = `L${++idCounter}`;
-  const layer = {
-    id,
-    name: `Layer ${layers.length+1}`,
-    events: [],
-    isRecording: false,
-    isPlaying: false,
-    recStartTime: 0,
-    loopLengthMs: 0,
-    part: null,
-    msg: ''
-  };
-  layers.push(layer);
-  renderLayers();
-}
-
-function renderLayers(){
-  layersWrap.innerHTML = '';
-  layers.forEach((L, idx) => {
-    const el = document.createElement('div');
-    el.className = 'layer';
-    el.id = L.id;
-    el.innerHTML = `
-      <div class="top">
-        <div style="display:flex;gap:12px;align-items:center;">
-          <div style="font-weight:700">${L.name}</div>
-          <div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
-          ${L.msg ? `<div class="msg" id="${L.id}-msg">${L.msg}</div>` : ''}
-        </div>
-        <div class="muted small">Loop: <span id="${L.id}-loop">—</span></div>
-      </div>
-      <div class="controls">
-        <button data-act="record" data-id="${L.id}">● Record</button>
-        <button data-act="stoprec" data-id="${L.id}">■ Stop</button>
-        <button data-act="play" data-id="${L.id}">▶ Play</button>
-        <button data-act="stopplay" data-id="${L.id}">⟹ Stop</button>
-        <button data-act="clear" data-id="${L.id}">⟲ Clear</button>
-        <button data-act="delete" data-id="${L.id}">✖ Delete</button>
-      </div>
-    `;
-    layersWrap.appendChild(el);
-    const recBtn = el.querySelector('[data-act="record"]');
-    if (L.isRecording) recBtn.classList.add('recording');
-    else if (L.events.length > 0) recBtn.classList.add('activeRec');
-  });
-}
-
-layersWrap.addEventListener('click', (ev) => {
-  const btn = ev.target.closest('button[data-act]');
-  if (!btn) return;
-  const act = btn.dataset.act;
-  const id = btn.dataset.id;
-  const L = layers.find(x => x.id === id);
-  if (!L) return;
-
-  if (act === 'record') startRecord(L);
-  if (act === 'stoprec') stopRecord(L);
-  if (act === 'play') startPlay(L);
-  if (act === 'stopplay') stopPlay(L);
-  if (act === 'clear') clearLayer(L);
-  if (act === 'delete') deleteLayer(L);
-});
-
-/* Recording */
-function startRecord(L){
-  stopPlay(L); // ensure not playing
-  L.events = [];
-  L.isRecording = true;
-  L.recStartTime = performance.now();
-  L.msg = '';
-  setLoopLabel(L, 'recording…');
-  renderLayers();
-}
-function stopRecord(L){
-  L.isRecording = false;
-  if (L.events.length > 0){
-    const last = L.events[L.events.length - 1].time;
-    L.loopLengthMs = Math.max(1000, last + 500);
-  } else L.loopLengthMs = 0;
-  setLoopLabel(L, L.loopLengthMs ? (Math.round(L.loopLengthMs)/1000 + 's') : '—');
-  renderLayers();
-}
-
-/* Playback using Tone.Part */
-async function startPlay(L){
-  if (L.events.length === 0){
-    L.msg = 'Layer kosong';
-    renderLayers();
-    return;
-  }
-  if (L.isPlaying) return;
-
-  // build events array for Tone.Part
-  const eventsForPart = L.events.map(ev => ({ time: (ev.time / 1000), ev }));
-
-  const part = new Tone.Part((time, payload) => {
-    const ev = payload.ev;
-    if (ev.type === 'note') {
-      synth.triggerAttackRelease(ev.value, (ev.dur ?? 0.25) + "s", time);
-    } else if (ev.type === 'chord') {
-      const notes = chordMap[ev.value];
-      if (notes) synth.triggerAttackRelease(notes, (ev.dur ?? 1.0) + "s", time);
-    } else if (ev.type === 'drum') {
-      const p = drumPlayers[ev.value];
-      if (p) {
-        try { p.start(time); } catch(e){ console.warn('drum schedule error', e); }
-      }
-    }
-  }, eventsForPart);
-
-  const loopSec = (L.loopLengthMs || (L.events[L.events.length-1].time + 500)) / 1000;
-  part.loop = true;
-  part.loopEnd = loopSec;
-
-  // ensure audio started and start transport for scheduling
-  await ensureAudioStarted();
-  if (Tone.Transport.state !== 'started') Tone.Transport.start();
-
-  part.start('+0.02');
-
-  L.part = part;
-  L.isPlaying = true;
-  L.msg = '';
-  setLoopLabel(L, (Math.round(loopSec*1000)/1000) + 's');
-  renderLayers();
-}
-
-function stopPlay(L){
-  if (!L.isPlaying) return;
-  L.isPlaying = false;
-  if (L.part) {
-    try { L.part.stop(); L.part.dispose(); } catch(e){}
-    L.part = null;
-  }
-  try { synth.releaseAll(); } catch(e){}
-  // stop all players (immediate)
-  Object.values(drumPlayers).forEach(p => { try{ p.stop(); } catch(e){} });
-  renderLayers();
-}
-
-/* Utilities */
-function clearLayer(L){
-  stopPlay(L);
-  L.events = [];
-  L.loopLengthMs = 0;
-  L.msg = '';
-  setLoopLabel(L, '—');
-  renderLayers();
-}
-function deleteLayer(L){
-  stopPlay(L);
-  layers = layers.filter(x => x.id !== L.id);
-  renderLayers();
-}
-function setLoopLabel(L, txt){
-  const el = document.getElementById(`${L.id}-loop`);
-  if (el) el.textContent = txt;
-}
-
-/* small keyboard mapping (optional) */
-const keyMap = ['z','x','c','v','b','n','m','q','w','e','r','t','y','u','i','o'];
-window.addEventListener('keydown', async (ev) => {
-  if (ev.repeat) return;
-  const k = ev.key.toLowerCase();
-  const idx = keyMap.indexOf(k);
-  if (idx === -1) return;
-  const pageStart = currentPage * padsPerPage;
-  if (mode === 'note'){
-    const midi = baseMidi - 12 + pageStart + idx;
-    const note = midiToNote(midi);
-    await ensureAudioStarted();
-    playNoteImmediate(note);
-  } else if (mode === 'chord'){
-    const name = chordModeList[(currentPage * padsPerPage + idx) % chordModeList.length];
-    await ensureAudioStarted();
-    playChordImmediate(name);
-  } else {
-    const fname = drumFiles[(currentPage * padsPerPage + idx) % drumFiles.length];
-    await ensureAudioStarted();
-    playDrumImmediate(fname);
-  }
-});
-
-/* init with one layer */
-addLayer();
-
-/* debug */
-window.__launchpad = { layers, renderGrid, playNoteImmediate, playChordImmediate, playDrumImmediate };
-
 </script>
 </body>
 </html>
