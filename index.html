@@ -35,14 +35,21 @@ function midiToNote(midi) {
   return name + octave;
 }
 
-// Chord bank (optional)
+// Chord bank
 const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7"];
+function getChordNotes(chord) {
+  const map = {
+    "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"],
+    "F":["F4","A4","C5"], "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"],
+    "C7":["C4","E4","G4","A#4"]
+  };
+  return map[chord] || ["C4"];
+}
 
 function buildPads() {
   const grid = document.getElementById("padGrid");
   grid.innerHTML = "";
   if (isNoteMode) {
-    // generate 16 note pad
     for (let i=0; i<16; i++) {
       const note = midiToNote(startNoteIndex + i);
       const btn = document.createElement("button");
@@ -69,7 +76,6 @@ function toggleMode() {
 function playNote(note) {
   const now = Tone.now();
   synth.triggerAttackRelease(note, "8n", now);
-  // record kalau ada layer
   layers.forEach(layer => {
     if (layer.isRecording) {
       layer.events.push({time: now - layer.startTime, type:"note", value: note});
@@ -78,15 +84,9 @@ function playNote(note) {
 }
 
 function playChord(chord) {
-  const map = {
-    "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"],
-    "F":["F4","A4","C5"], "G":["G4","B4","D5"], "Am":["A4","C5","E5"], "Bdim":["B4","D5","F5"],
-    "C7":["C4","E4","G4","A#4"]
-  };
   const now = Tone.now();
-  const notes = map[chord] || ["C4"];
+  const notes = getChordNotes(chord);
   synth.triggerAttackRelease(notes, "1n", now);
-  // record kalau ada layer
   layers.forEach(layer => {
     if (layer.isRecording) {
       layer.events.push({time: now - layer.startTime, type:"chord", value: chord});
@@ -96,62 +96,95 @@ function playChord(chord) {
 
 // ================= Layers ==================
 let layers = [];
+let layerCounter = 0; // unique ID counter
 
 function addLayer() {
   const idx = layers.length;
-  const layer = { events: [], isRecording: false, isPlaying: false, loopId: null, startTime: 0 };
+  const layerId = "layer-" + (++layerCounter);
+  const layer = { id: layerId, events: [], isRecording: false, isPlaying: false, loopId: null, startTime: 0 };
   layers.push(layer);
 
   const div = document.createElement("div");
   div.className = "layer";
+  div.id = layerId;
   div.innerHTML = `<b>Layer ${idx+1}</b>
     <div class="controls">
-      <button onclick="recordLayer(${idx})">Record</button>
-      <button onclick="stopRecord(${idx})">Stop</button>
-      <button onclick="playLayer(${idx})">Play</button>
-      <button onclick="stopLayer(${idx})">Stop Play</button>
-      <button onclick="clearLayer(${idx})">Clear</button>
-      <button onclick="deleteLayer(${idx})">Delete</button>
+      <button onclick="recordLayer('${layerId}')">Record</button>
+      <button onclick="stopRecord('${layerId}')">Stop</button>
+      <button onclick="playLayer('${layerId}')">Play</button>
+      <button onclick="stopLayer('${layerId}')">Stop Play</button>
+      <button onclick="clearLayer('${layerId}')">Clear</button>
+      <button onclick="deleteLayer('${layerId}')">Delete</button>
     </div>`;
   document.getElementById("layers").appendChild(div);
 }
 
-function recordLayer(i) {
-  layers[i].events = [];
-  layers[i].isRecording = true;
-  layers[i].startTime = Tone.now();
-  alert("Recording Layer " + (i+1));
+function getLayerById(id) {
+  return layers.find(l => l && l.id === id);
 }
-function stopRecord(i) {
-  layers[i].isRecording = false;
+
+function recordLayer(id) {
+  const layer = getLayerById(id);
+  if (!layer) return;
+  layer.events = [];
+  layer.isRecording = true;
+  layer.startTime = Tone.now();
+  alert("Recording " + id);
 }
-function playLayer(i) {
-  if (layers[i].events.length === 0) { alert("No events in Layer " + (i+1)); return; }
-  layers[i].isPlaying = true;
-  const duration = layers[i].events[layers[i].events.length-1].time + 2; // loop length
+function stopRecord(id) {
+  const layer = getLayerById(id);
+  if (layer) layer.isRecording = false;
+}
+
+function playLayer(id) {
+  const layer = getLayerById(id);
+  if (!layer || layer.events.length === 0) return alert("No events in " + id);
+  layer.isPlaying = true;
+  const duration = layer.events[layer.events.length-1].time + 2; // loop length
+
   function schedule() {
-    layers[i].events.forEach(e => {
-      if (e.type === "note") synth.triggerAttackRelease(e.value, "8n", Tone.now() + e.time);
-      if (e.type === "chord") playChord(e.value);
+    layer.events.forEach(e => {
+      if (e.type === "note") {
+        synth.triggerAttackRelease(e.value, "8n", Tone.now() + e.time);
+      }
+      if (e.type === "chord") {
+        const notes = getChordNotes(e.value);
+        synth.triggerAttackRelease(notes, "1n", Tone.now() + e.time);
+      }
     });
   }
   schedule();
-  layers[i].loopId = setInterval(schedule, duration*1000);
+  layer.loopId = setInterval(schedule, duration*1000);
 }
-function stopLayer(i) {
-  layers[i].isPlaying = false;
-  if (layers[i].loopId) clearInterval(layers[i].loopId);
+
+function stopLayer(id) {
+  const layer = getLayerById(id);
+  if (layer && layer.loopId) {
+    clearInterval(layer.loopId);
+    layer.isPlaying = false;
+  }
 }
-function clearLayer(i) {
-  stopLayer(i);
-  layers[i].events = [];
-  alert("Layer " + (i+1) + " cleared");
+
+function clearLayer(id) {
+  const layer = getLayerById(id);
+  if (layer) {
+    stopLayer(id);
+    layer.events = [];
+    alert(id + " cleared");
+  }
 }
-function deleteLayer(i) {
-  stopLayer(i);
-  layers[i] = null; // buang dari array
-  document.getElementById("layers").children[i].remove(); // buang UI
+
+function deleteLayer(id) {
+  const layer = getLayerById(id);
+  if (!layer) return;
+  stopLayer(id);
+  // buang dari array
+  layers = layers.filter(l => l && l.id !== id);
+  // buang UI
+  const div = document.getElementById(id);
+  if (div) div.remove();
 }
 </script>
+
 </body>
 </html>
