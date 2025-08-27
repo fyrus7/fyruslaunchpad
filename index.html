@@ -1,176 +1,266 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Web Launchpad – Stable</title>
-  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0f1115; color:#e9eef5; }
-    header { display:flex; gap:8px; align-items:center; justify-content:center; padding:14px 10px; position:sticky; top:0; background:#0f1115cc; backdrop-filter: blur(6px); border-bottom:1px solid #202534; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; }
-    .grid { display:grid; grid-template-columns: repeat(8, minmax(50px, 1fr)); gap:6px; width:min(500px, 96vw); margin:16px auto; }
-    .btn { padding:10px 12px; border:1px solid #283043; background:#161a24; color:#e9eef5; border-radius:10px; cursor:pointer; transition:transform .02s ease, background .2s ease, border .2s ease; }
-    .btn:hover { background:#1b2130; }
-    .btn:active { transform: translateY(1px); }
-    .btn.primary { background:#1f5eff; border-color:#2a66ff; }
-    .btn.danger  { background:#3a1520; border-color:#6b1e31; }
-    .btn.success { background:#19532e; border-color:#216f3f; }
-    .btn.warn    { background:#4a3a15; border-color:#6f5621; }
-    .pad { height:50px; text-align:center; font-weight:600; border-radius:8px; user-select:none; }
-    .pad.note  { background:#1a2030; border:1px solid #2b3857; }
-    .pad.chord { background:#212028; border:1px solid #3a3850; }
-    .pad:active { filter: brightness(1.2); }
-    .section { width:min(780px, 96vw); margin: 8px auto 24px; }
-    .layer { border:1px solid #27304a; background:#141a26; border-radius:12px; padding:12px; margin:10px 0; }
-    .layer header { display:flex; gap:10px; align-items:center; justify-content:space-between; position:static; background:transparent; border:none; padding:0 0 8px 0; }
-    .layer .name { font-weight:700; }
-    .muted { opacity:.7; font-size:.9em; }
-    .pill { padding:4px 8px; border-radius:999px; border:1px solid #283043; }
-    .spacer { flex:1; }
-    .recording { background:red !important; animation: blink 1s infinite; }
-    .activeRec { background:green !important; }
-    @keyframes blink {
-      0%,50%,100% { background:red; }
-      25%,75% { background:darkred; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web Launchpad — Pages + Drum Kit + Layers</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto; background:#0f1115; color:#e9eef5; -webkit-tap-highlight-color: transparent; }
+  header { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:10px; border-bottom:1px solid #202534; background:#0f1115cc; position:sticky; top:0; z-index:10; }
+  .left, .right { display:flex; gap:8px; align-items:center; }
+  select, button { font-family:inherit; }
+  .modeSelect { padding:8px 10px; border-radius:8px; background:#151922; color:#e9eef5; border:1px solid #283043; }
+  .pager { display:flex; gap:8px; align-items:center; }
+  .pager button { padding:8px 10px; border-radius:8px; border:1px solid #283043; background:#161a24; color:#e9eef5; }
+  main { padding:14px; display:flex; flex-direction:column; gap:14px; align-items:center; max-width:980px; margin:0 auto; }
+  /* responsive 4x4 grid, size scales with viewport */
+  .gridWrap { width:100%; max-width:520px; }
+  .grid {
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:10px;
+    width:100%;
+  }
+  .pad {
+    aspect-ratio: 1 / 1;
+    display:flex; align-items:center; justify-content:center; border-radius:12px;
+    background:#151a24; border:1px solid #263147; font-weight:700; user-select:none;
+    font-size:1rem; touch-action:manipulation;
+  }
+  .pad.note { background:linear-gradient(180deg,#141821,#1b2430); }
+  .pad.chord { background:linear-gradient(180deg,#16141b,#241f2a); }
+  .pad.sample { background:linear-gradient(180deg,#291a11,#3a271b); }
+  .pad:active { filter:brightness(1.18); transform:translateY(1px); }
+  .flash { box-shadow:0 0 16px rgba(255,200,100,.18); }
+  /* Layers panel */
+  .layersWrap { width:100%; max-width:720px; display:flex; flex-direction:column; gap:8px; }
+  .layer { display:flex; flex-direction:column; gap:8px; padding:10px; border-radius:10px; background:#0f1720; border:1px solid #223044; }
+  .layerHeader { display:flex; align-items:center; gap:8px; }
+  .layerTitle { font-weight:700; }
+  .layerControls { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+  .lbtn { padding:8px 10px; border-radius:8px; border:1px solid #283043; background:#151a24; color:#e9eef5; cursor:pointer; }
+  .lbtn.recording { background:red !important; animation:blink 1s infinite; color:white; }
+  .lbtn.activeRec { background:green !important; color:white; }
+  @keyframes blink { 0%,50%,100%{background:red} 25%,75%{background:#8b0000} }
+  .muted { opacity:.7; font-size:.9rem; }
+  .spacer { flex:1; }
+  footer { text-align:center; padding:14px; font-size:.85rem; color:#aab7c9; }
+  /* mobile friendly: larger pads on small screens */
+  @media (max-width:420px){
+    .pad { font-size:0.95rem; border-radius:10px; }
+    header { padding:8px; }
+  }
+</style>
 </head>
 <body>
 
-  <header>
-    <div class="spacer"></div>
-    <button id="modeBtn" class="btn">Mode: Note</button>
-    <div class="row">
-      <label class="muted small">Octave</label>
-      <button id="octDown" class="btn">−</button>
-      <span id="octLabel" class="pill">C3</span>
-      <button id="octUp" class="btn">+</button>
+<header>
+  <div class="left">
+    <select id="modeSelect" class="modeSelect">
+      <option value="note">Note Mode</option>
+      <option value="chord">Chord Mode</option>
+      <option value="drum">Drum Kit</option>
+    </select>
+
+    <div class="pager" style="margin-left:6px;">
+      <button id="prevPageBtn">◀ Prev</button>
+      <div id="pageIndicator" class="muted">Page 1 / 1</div>
+      <button id="nextPageBtn">Next ▶</button>
     </div>
-  </header>
+  </div>
 
-  <main>
-    <section class="section">
-      <div id="padGrid" class="grid"></div>
-    </section>
+  <div class="right">
+    <div class="muted">Octave</div>
+    <button id="octDown" class="modeSelect">−</button>
+    <div id="octLabel" class="modeSelect">C3</div>
+    <button id="octUp" class="modeSelect">+</button>
+  </div>
+</header>
 
-    <section class="section">
-      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
-        <h2 style="margin:0">Layers</h2>
-        <button id="addLayerBtn" class="btn primary">+ Add Layer</button>
-      </div>
-      <div id="layersWrap"></div>
-    </section>
-  </main>
+<main>
+  <div class="gridWrap">
+    <div id="padGrid" class="grid"></div>
+  </div>
+
+  <section style="width:100%; max-width:980px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h2 style="margin:0">Layers</h2>
+      <button id="addLayerBtn" class="lbtn">+ Add Layer</button>
+    </div>
+    <div id="layersWrap" class="layersWrap"></div>
+  </section>
+</main>
+
+<footer>Launchpad — Notes / Chords / Drum Kit with unlimited layers</footer>
 
 <script>
-/* ========= Audio setup ========= */
+/* ================== Tone + Samples ================== */
 const synth = new Tone.PolySynth(Tone.Synth, {
   maxPolyphony: 32,
-  options: { envelope: { attack: 0.005, decay: 0.2, sustain: 0.4, release: 0.8 } }
+  options: { envelope: { attack:0.005, decay:0.2, sustain:0.4, release:0.8 } }
 }).toDestination();
 
-/* ========= Helpers ========= */
+/* Drum sample map - put files inside /samples/ in same folder */
+const drumMap = {
+  // keys (identifiers) : relative path
+  "kick":   "samples/kick.wav",
+  "snare":  "samples/snare.wav",
+  "hihat":  "samples/hihat_closed.wav",
+  "hihat_o":"samples/hihat_open.wav",
+  "clap":   "samples/clap.wav",
+  "tom1":   "samples/tom_low.wav",
+  "tom2":   "samples/tom_mid.wav",
+  "tom3":   "samples/tom_high.wav",
+  "rim":    "samples/rim.wav",
+  "perc1":  "samples/perc1.wav",
+  "perc2":  "samples/perc2.wav",
+  "shaker": "samples/shaker.wav",
+  "crash":  "samples/crash.wav",
+  "ride":   "samples/ride.wav",
+  "fx1":    "samples/fx1.wav",
+  "fx2":    "samples/fx2.wav"
+};
+
+let drumPlayers = null;
+function loadDrumPlayers(){
+  // Tone.Players takes an object of name:url
+  drumPlayers = new Tone.Players(drumMap).toDestination();
+  // Optionally show when loaded:
+  Tone.loaded().then(()=> console.log("Drum samples loaded"));
+}
+loadDrumPlayers();
+
+/* ================== Grid / Pages ================== */
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const midiToNote = (midi) => `${NOTE_NAMES[midi % 12]}${Math.floor(midi/12)-1}`;
-function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+function midiToNote(m){ return `${NOTE_NAMES[m%12]}${Math.floor(m/12)-1}`; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
-/* ========= Grid (Note/Chord) ========= */
-let mode = 'note'; // 'note' | 'chord'
-let baseMidi = 48; // C3
-const gridSize = 64; // 8x8
-const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7"];
+let mode = 'note';               // note | chord | drum
+let baseMidi = 48;               // C3
+const padsPerPage = 16;
+const totalNotes = 64;           // 64-note range (4 pages)
+const totalPagesNotes = Math.ceil(totalNotes / padsPerPage); // 4
+const chordBank = ["C","Dm","Em","F","G","Am","Bdim","C7","D7","E7","Fmaj7","G7","Am7","B7","C7#9","Dmaj7","Em7","F#m","G#m","Amaj7","Bmaj7","Cadd9","Dsus2","Esus4","Fsus2","Gsus4","Asus2","Bdim7","Cm","Dm7","Em9","Fm7","Gm7","Am9","Bm7"]; // many chords
+// We'll treat chord pages from chordBank length
 
-function getChordNotes(chord) {
+// drum order - 16 items => one page
+const drumKeys = Object.keys(drumMap); // 16 keys
+
+let currentPage = 0; // 0-based
+
+const modeSelect = document.getElementById('modeSelect');
+const padGrid = document.getElementById('padGrid');
+const pageIndicator = document.getElementById('pageIndicator');
+const prevBtn = document.getElementById('prevPageBtn');
+const nextBtn = document.getElementById('nextPageBtn');
+const octLabel = document.getElementById('octLabel');
+const octDown = document.getElementById('octDown');
+const octUp = document.getElementById('octUp');
+
+function pagesCountForMode(m){
+  if (m === 'note') return totalPagesNotes;
+  if (m === 'chord') return Math.ceil(chordBank.length / padsPerPage);
+  if (m === 'drum') return 1; // drum pack mapped to single page (16)
+  return 1;
+}
+
+function renderPageIndicator(){
+  const total = pagesCountForMode(mode);
+  pageIndicator.textContent = `Page ${currentPage+1} / ${total}`;
+  prevBtn.disabled = currentPage === 0;
+  nextBtn.disabled = currentPage >= total - 1;
+}
+
+function renderGrid(){
+  padGrid.innerHTML = '';
+  const totalPads = padsPerPage;
+  if (mode === 'note'){
+    const startNote = baseMidi + currentPage * padsPerPage;
+    for (let i=0;i<totalPads;i++){
+      const note = midiToNote(startNote + i);
+      const btn = document.createElement('button');
+      btn.className = 'pad note';
+      btn.textContent = note;
+      btn.onclick = async () => { await Tone.start(); handlePadPress({type:'note', value: note}, btn); };
+      padGrid.appendChild(btn);
+    }
+  } else if (mode === 'chord'){
+    const start = currentPage * padsPerPage;
+    for (let i=0;i<totalPads;i++){
+      const idx = start + i;
+      const label = chordBank[idx] || '';
+      const btn = document.createElement('button');
+      btn.className = 'pad chord';
+      btn.textContent = label || '';
+      btn.onclick = async () => { if(!label) return; await Tone.start(); handlePadPress({type:'chord', value: label}, btn); };
+      padGrid.appendChild(btn);
+    }
+  } else if (mode === 'drum'){
+    // single page: 16 drum pads (drumKeys)
+    for (let i=0;i<totalPads;i++){
+      const key = drumKeys[i] || null;
+      const label = key ? key.replace(/_/g,'') : '';
+      const btn = document.createElement('button');
+      btn.className = 'pad sample';
+      btn.textContent = label || '';
+      btn.onclick = async () => { if(!key) return; await Tone.start(); handlePadPress({type:'sample', value: key}, btn); };
+      padGrid.appendChild(btn);
+    }
+  }
+  renderPageIndicator();
+}
+
+/* ========== Playing helpers ========== */
+function playNoteNow(note, whenSec = 0, dur = 0.25){
+  synth.triggerAttackRelease(note, dur + "s", Tone.now() + whenSec);
+}
+function playChordNow(chordName, whenSec = 0, dur = 1){
+  // simple chord mapping, can be extended
   const map = {
     "C":["C4","E4","G4"], "Dm":["D4","F4","A4"], "Em":["E4","G4","B4"],
     "F":["F4","A4","C5"], "G":["G4","B4","D5"], "Am":["A4","C5","E5"],
     "Bdim":["B4","D5","F5"], "C7":["C4","E4","G4","A#4"]
   };
-  return map[chord] || ["C4"];
+  const notes = map[chordName] || [chordName + "4"];
+  synth.triggerAttackRelease(notes, dur + "s", Tone.now() + whenSec);
+}
+function playSampleNow(key){
+  if (!drumPlayers) return;
+  const p = drumPlayers.player(key);
+  if (p) p.start();
 }
 
-function renderGrid(){
-  const grid = document.getElementById('padGrid');
-  grid.innerHTML = '';
-  if (mode === 'note'){
-    for (let i=0;i<gridSize;i++){
-      const note = midiToNote(baseMidi + i);
-      const btn = document.createElement('button');
-      btn.className = 'btn pad note';
-      btn.textContent = note;
-      btn.onclick = async () => { await Tone.start(); playNote(note); };
-      grid.appendChild(btn);
-    }
-  } else {
-    chordBank.forEach(ch => {
-      const btn = document.createElement('button');
-      btn.className = 'btn pad chord';
-      btn.textContent = ch;
-      btn.onclick = async () => { await Tone.start(); playChord(ch); };
-      grid.appendChild(btn);
-    });
-    for (let i=chordBank.length;i<gridSize;i++){
-      const s = document.createElement('div'); s.style.visibility='hidden';
-      grid.appendChild(s);
-    }
-  }
-}
-renderGrid();
+/* === Unified pad handler: visual + play + record === */
+function handlePadPress(ev, btnEl){
+  // visual flash
+  btnEl.classList.add('flash');
+  setTimeout(()=> btnEl.classList.remove('flash'), 120);
 
-document.getElementById('modeBtn').addEventListener('click', () => {
-  mode = (mode === 'note') ? 'chord' : 'note';
-  document.getElementById('modeBtn').textContent = `Mode: ${mode==='note'?'Note':'Chord'}`;
-  renderGrid();
-});
+  // play depending on type
+  if (ev.type === 'note') playNoteNow(ev.value);
+  if (ev.type === 'chord') playChordNow(ev.value);
+  if (ev.type === 'sample') playSampleNow(ev.value);
 
-function updateOctLabel(){
-  document.getElementById('octLabel').textContent = midiToNote(baseMidi);
-}
-updateOctLabel();
-
-document.getElementById('octDown').addEventListener('click', () => {
-  baseMidi = clamp(baseMidi - 12, 24, 84);
-  updateOctLabel();
-  if (mode==='note') renderGrid();
-});
-document.getElementById('octUp').addEventListener('click', () => {
-  baseMidi = clamp(baseMidi + 12, 24, 84);
-  updateOctLabel();
-  if (mode==='note') renderGrid();
-});
-
-/* ========= Play & Record ========= */
-function playNote(note, whenSec = 0.0, dur = 0.25){
-  synth.triggerAttackRelease(note, dur+"s", Tone.now()+whenSec);
+  // record to layers that are recording
   layers.forEach(L => {
     if (L.isRecording){
       const t = performance.now() - L.recStartTime;
-      L.events.push({ time: t, type: 'note', value: note, dur });
-    }
-  });
-}
-function playChord(chord, whenSec = 0.0, dur = 1.0){
-  const notes = getChordNotes(chord);
-  synth.triggerAttackRelease(notes, dur+"s", Tone.now()+whenSec);
-  layers.forEach(L => {
-    if (L.isRecording){
-      const t = performance.now() - L.recStartTime;
-      L.events.push({ time: t, type: 'chord', value: chord, dur });
+      L.events.push({ time: t, ...ev });
     }
   });
 }
 
-/* ========= Layers ========= */
+/* ========== Layers system ========== */
 let layers = [];
-let idCounter = 0;
+let layerCounter = 0;
 const layersWrap = document.getElementById('layersWrap');
 document.getElementById('addLayerBtn').addEventListener('click', addLayer);
 
 function addLayer(){
-  const id = `L${++idCounter}`;
-  const layer = { id, name:`Layer ${layers.length+1}`, events:[], isRecording:false, isPlaying:false, recStartTime:0, loopLengthMs:0, timers:[] };
+  const id = `layer-${++layerCounter}`;
+  const layer = { id, name: `Layer ${layers.length+1}`, events: [], isRecording:false, isPlaying:false, recStartTime:0, loopLengthMs:0, timers: [] };
   layers.push(layer);
   renderLayers();
 }
@@ -178,47 +268,131 @@ function addLayer(){
 function renderLayers(){
   layersWrap.innerHTML = '';
   layers.forEach(L=>{
-    const el=document.createElement('div');
-    el.className='layer';
-    el.id=L.id;
-    el.innerHTML=`
-      <header><div class="name">${L.name}</div><div class="muted small">${L.events.length} event${L.events.length!==1?'s':''}</div></header>
-      <div class="row wrap">
-        <button class="btn" data-act="record" data-id="${L.id}">● Record</button>
-        <button class="btn" data-act="stoprec" data-id="${L.id}">■ Stop</button>
-        <button class="btn" data-act="play" data-id="${L.id}">▶ Play</button>
-        <button class="btn" data-act="stopplay" data-id="${L.id}">⏹ Stop</button>
-        <button class="btn warn" data-act="clear" data-id="${L.id}">⟲ Clear</button>
-        <button class="btn danger" data-act="delete" data-id="${L.id}">✖ Delete</button>
-        <span class="spacer"></span><span class="muted small">Loop: <span id="${L.id}-loop">—</span></span>
-      </div>`;
+    const el = document.createElement('div'); el.className='layer'; el.id=L.id;
+    el.innerHTML = `
+      <div class="layerHeader">
+        <div class="layerTitle">${L.name}</div>
+        <div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
+      </div>
+      <div class="layerControls">
+        <button class="lbtn" data-act="record" data-id="${L.id}">● Record</button>
+        <button class="lbtn" data-act="stoprec" data-id="${L.id}">■ Stop</button>
+        <button class="lbtn" data-act="play" data-id="${L.id}">▶ Play</button>
+        <button class="lbtn" data-act="stopplay" data-id="${L.id}">⏹ Stop</button>
+        <button class="lbtn" data-act="clear" data-id="${L.id}">⟲ Clear</button>
+        <button class="lbtn" data-act="delete" data-id="${L.id}">✖ Delete</button>
+        <div class="spacer"></div>
+        <div class="muted">Loop: <span id="${L.id}-loop">—</span></div>
+      </div>
+    `;
     layersWrap.appendChild(el);
-    // style Record button
+    // apply visual states
     const recBtn = el.querySelector('[data-act="record"]');
-    if(L.isRecording) recBtn.classList.add('recording');
-    else if(L.events.length>0) recBtn.classList.add('activeRec');
+    if (L.isRecording) recBtn.classList.add('recording');
+    else if (L.events.length>0) recBtn.classList.add('activeRec');
   });
 }
-layersWrap.addEventListener('click',(e)=>{
-  const btn=e.target.closest('button[data-act]'); if(!btn) return;
-  const act=btn.dataset.act, id=btn.dataset.id;
-  const L=layers.find(x=>x.id===id); if(!L) return;
-  if(act==='record') startRecord(L);
-  if(act==='stoprec') stopRecord(L);
-  if(act==='play') startPlay(L);
-  if(act==='stopplay') stopPlay(L);
-  if(act==='clear') clearLayer(L);
-  if(act==='delete') deleteLayer(L);
+
+layersWrap.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act, id = btn.dataset.id;
+  const L = layers.find(x=>x.id===id);
+  if (!L) return;
+  if (act==='record') startRecord(L);
+  if (act==='stoprec') stopRecord(L);
+  if (act==='play') startPlay(L);
+  if (act==='stopplay') stopPlay(L);
+  if (act==='clear') clearLayer(L);
+  if (act==='delete') deleteLayer(L);
 });
-function startRecord(L){ clearScheduled(L); L.events=[]; L.isRecording=true; L.recStartTime=performance.now(); renderLayers(); setLoopLabel(L,'rec…'); }
-function stopRecord(L){ L.isRecording=false; if(L.events.length>0){ const last=L.events[L.events.length-1].time; L.loopLengthMs=Math.max(1000,last+500);} else L.loopLengthMs=0; renderLayers(); setLoopLabel(L,L.loopLengthMs?(Math.round(L.loopLengthMs)/1000+'s'):'—'); }
-function startPlay(L){ if(L.events.length===0)return alert('Layer kosong'); if(L.isPlaying)return; L.isPlaying=true; scheduleLayer(L);}
-function stopPlay(L){ L.isPlaying=false; clearScheduled(L);}
-function scheduleLayer(L){ clearScheduled(L); const loopMs=L.loopLengthMs||(L.events[L.events.length-1].time+500); const t0=performance.now(); for(const ev of L.events){ const delay=Math.max(0,ev.time-(performance.now()-t0)); const h=setTimeout(()=>{ if(ev.type==='note')playNote(ev.value,0,ev.dur??0.25); if(ev.type==='chord')playChord(ev.value,0,ev.dur??1.0); },delay); L.timers.push(h);} const loopHandle=setTimeout(()=>{ if(L.isPlaying) scheduleLayer(L); },loopMs); L.timers.push(loopHandle);}
-function clearScheduled(L){ L.timers.forEach(clearTimeout); L.timers=[]; }
-function clearLayer(L){ stopPlay(L); L.events=[]; L.loopLengthMs=0; renderLayers(); setLoopLabel(L,'—'); }
-function deleteLayer(L){ stopPlay(L); layers=layers.filter(x=>x.id!==L.id); renderLayers(); }
-function setLoopLabel(L,txt){ const el=document.getElementById(`${L.id}-loop`); if(el) el.textContent=txt; }
+
+function startRecord(L){
+  clearScheduled(L);
+  L.events = [];
+  L.isRecording = true;
+  L.recStartTime = performance.now();
+  setLoopLabel(L, 'recording…');
+  renderLayers();
+}
+function stopRecord(L){
+  L.isRecording = false;
+  if (L.events.length>0){
+    const lastT = L.events[L.events.length-1].time;
+    L.loopLengthMs = Math.max(800, lastT + 400);
+  } else L.loopLengthMs = 0;
+  setLoopLabel(L, L.loopLengthMs ? (Math.round(L.loopLengthMs)/1000 + 's') : '—');
+  renderLayers();
+}
+function startPlay(L){
+  if (L.events.length===0) { alert('Layer kosong.'); return; }
+  if (L.isPlaying) return;
+  L.isPlaying = true;
+  scheduleLayer(L);
+  renderLayers();
+}
+function stopPlay(L){
+  L.isPlaying = false;
+  clearScheduled(L);
+  renderLayers();
+}
+function scheduleLayer(L){
+  clearScheduled(L);
+  const loopMs = L.loopLengthMs || (L.events[L.events.length-1].time + 400);
+  const t0 = performance.now();
+  for (const ev of L.events){
+    const delay = Math.max(0, ev.time - (performance.now() - t0));
+    const h = setTimeout(() => {
+      if (ev.type === 'note') playNoteNow(ev.value);
+      if (ev.type === 'chord') playChordNow(ev.value);
+      if (ev.type === 'sample') playSampleNow(ev.value);
+    }, delay);
+    L.timers.push(h);
+  }
+  const loopHandle = setTimeout(() => {
+    if (L.isPlaying) scheduleLayer(L);
+  }, loopMs);
+  L.timers.push(loopHandle);
+}
+function clearScheduled(L){ L.timers.forEach(clearTimeout); L.timers = []; }
+
+function clearLayer(L){
+  stopPlay(L);
+  L.events = [];
+  L.loopLengthMs = 0;
+  setLoopLabel(L,'—');
+  renderLayers();
+}
+function deleteLayer(L){
+  stopPlay(L);
+  layers = layers.filter(x => x.id !== L.id);
+  renderLayers();
+}
+function setLoopLabel(L, txt){
+  const el = document.getElementById(`${L.id}-loop`);
+  if (el) el.textContent = txt;
+}
+
+/* ========== Page controls & mode changes ========== */
+modeSelect.addEventListener('change', (e) => {
+  mode = e.target.value;
+  currentPage = 0;
+  renderGrid();
+});
+prevBtn.addEventListener('click', () => { currentPage = Math.max(0, currentPage - 1); renderGrid(); });
+nextBtn.addEventListener('click', () => { currentPage = currentPage + 1; renderGrid(); });
+
+octDown.addEventListener('click', () => { baseMidi = clamp(baseMidi - 12, 24, 84); updateOct(); });
+octUp.addEventListener('click', () => { baseMidi = clamp(baseMidi + 12, 24, 84); updateOct(); });
+function updateOct(){ octLabel.textContent = midiToNote(baseMidi); renderGrid(); }
+updateOct();
+
+/* ========== Initialize ======== */
+renderGrid();
+
+/* Add initial layer */
+addLayer();
+
 </script>
 </body>
 </html>
