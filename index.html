@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Fyrus Launchpad</title>
+<title>Launchpad — Full Patch</title>
 <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
 <style>
 :root { color-scheme: dark; }
@@ -52,10 +52,6 @@ footer { height:60px; }
 <span id="octLabel" class="pill">C3</span>
 <button id="octUp" class="btn">+</button>
 </div>
-<div style="display:flex;align-items:center;gap:8px;margin-left:12px;">
-<button id="metronomeBtn" class="btn">Metronome: OFF</button>
-<input type="number" id="bpmInput" value="120" min="30" max="300" style="width:60px; border-radius:6px; border:1px solid #2a3648; background:#12161b; color:#eaf0fb; padding:4px;">
-</div>
 </div>
 </div>
 <div class="page-row">
@@ -98,7 +94,6 @@ const modeBtn=document.getElementById('modeBtn'); const octLabel=document.getEle
 const octDown=document.getElementById('octDown'); const octUp=document.getElementById('octUp');
 const prevPageBtn=document.getElementById('prevPage'); const nextPageBtn=document.getElementById('nextPage');
 const addLayerBtn=document.getElementById('addLayerBtn');
-const metronomeBtn=document.getElementById('metronomeBtn'); const bpmInput=document.getElementById('bpmInput');
 function updateOctLabel(){octLabel.textContent=midiToNote(baseMidi);}
 updateOctLabel();
 octDown.addEventListener('click',()=>{baseMidi=clamp(baseMidi-12,24,84);updateOctLabel(); renderGrid();});
@@ -108,30 +103,37 @@ prevPageBtn.addEventListener('click',()=>{if(currentPage>0) currentPage--;render
 nextPageBtn.addEventListener('click',()=>{if(currentPage<totalPagesForMode()-1) currentPage++;renderGrid();});
 function totalPagesForMode(){return Math.ceil((mode==='note'?72:(mode==='chord'?chordBank.length:drumFiles.length))/padsPerPage);}
 
-/* ---------- Metronome ---------- */
-let metroOn=false; let metroLoop=null;
-const clickSynth = new Tone.MembraneSynth({pitchDecay:0.01,octaves:10,envelope:{attack:0.001,decay:0.1,sustain:0,release:0.1}}).toDestination();
-function startMetronome(){Tone.Transport.stop(); Tone.Transport.cancel(); const bpm=clamp(parseInt(bpmInput.value)||120,30,300); Tone.Transport.bpm.value=bpm; metroLoop = new Tone.Loop((time)=>{clickSynth.triggerAttackRelease("C2","8n",time);}, "4n"); metroLoop.start(0); Tone.Transport.start(); metroOn=true; metronomeBtn.textContent='Metronome: ON';}
-function stopMetronome(){if(metroLoop) metroLoop.stop(); Tone.Transport.stop(); metroOn=false; metronomeBtn.textContent='Metronome: OFF';}
-metronomeBtn.addEventListener('click',async()=>{await Tone.start(); metroOn?stopMetronome():startMetronome();});
-
 /* ---------- Audio helpers ---------- */
 async function ensureAudioStarted(){try{await Tone.start();}catch{}}
 function flashPad(el){if(!el)return; el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),140);}
 function playNoteImmediate(note){synth.triggerAttackRelease(note,'8n',Tone.now()); flashPad(padMap[note]); recordEvent('note',note);}
-function playChordImmediate(chord){const notes=chordBank.includes(chord)?chord.split(''): [chord]; synth.triggerAttackRelease(notes,'1n',Tone.now()); recordEvent('chord',chord);}
+function playChordImmediate(chord){const notes=chordBank.includes(chord)?chord.split(''):[chord]; synth.triggerAttackRelease(notes,'1n',Tone.now()); recordEvent('chord',chord); }
 function playDrumImmediate(fname){const player=drumPlayers[fname]; if(player){player.start();} recordEvent('drum',fname);}
 
 /* ---------- Layers ---------- */
 let layers=[],idCounter=0,layersWrap=document.getElementById('layersWrap');
 function addLayer(){const id=`L${++idCounter}`; const L={id,name:`Layer ${layers.length+1}`,events:[],isRecording:false,isPlaying:false,recStartTime:0,loopLengthMs:0,part:null,msg:''}; layers.push(L); renderLayers();}
 addLayerBtn.addEventListener('click',addLayer);
-function renderLayers(){layersWrap.innerHTML=''; layers.forEach(L=>{ const el=document.createElement('div'); el.className='layer'; el.id=L.id; el.innerHTML=`<div class="top"><div style="display:flex;gap:12px;align-items:center;"><div style="font-weight:700">${L.name}</div><div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>${L.msg?`<div class="msg" id="${L.id}-msg">${L.msg}</div>`:''}</div><div class="muted small">Loop: <span id="${L.id}-loop">—</span></div></div><div class="controls"><button data-layer="${L.id}" class="recordBtn">${L.isRecording?'Stop':'Rec'}</button><button data-layer="${L.id}" class="playBtn" ${L.isPlaying?'disabled':''}>Play</button></div>`; layersWrap.appendChild(el); const recBtn=el.querySelector('.recordBtn'); const playBtn=el.querySelector('.playBtn'); recBtn.addEventListener('click',()=>toggleRecord(L.id,recBtn,playBtn)); playBtn.addEventListener('click',()=>playLayer(L.id));});}
+function renderLayers(){layersWrap.innerHTML=''; layers.forEach(L=>{ const el=document.createElement('div'); el.className='layer'; el.id=L.id; el.innerHTML=`
+<div class="top">
+<div style="display:flex;gap:12px;align-items:center;">
+<div style="font-weight:700">${L.name}</div>
+<div class="muted">${L.events.length} event${L.events.length!==1?'s':''}</div>
+${L.msg?`<div class="msg" id="${L.id}-msg">${L.msg}</div>`:''}
+</div>
+<div class="muted small">Loop: <span id="${L.id}-loop">—</span></div>
+</div>
+<div class="controls">
+<button data-layer="${L.id}" class="recordBtn">${L.isRecording?'Stop':'Rec'}</button>
+<button data-layer="${L.id}" class="playBtn" ${L.isPlaying?'disabled':''}>Play</button>
+</div>`; layersWrap.appendChild(el); const recBtn=el.querySelector('.recordBtn'); const playBtn=el.querySelector('.playBtn');
+recBtn.addEventListener('click',()=>toggleRecord(L.id,recBtn,playBtn));
+playBtn.addEventListener('click',()=>playLayer(L.id));});}
 
 /* ---------- Recording ---------- */
 function toggleRecord(id,recBtn,playBtn){const L=layers.find(x=>x.id===id); if(!L)return; if(L.isRecording){L.isRecording=false; recBtn.textContent='Rec'; L.loopLengthMs=Date.now()-L.recStartTime; L.msg=`Recorded ${L.events.length} event${L.events.length!==1?'s':''}`; renderLayers(); }else{L.isRecording=true; recBtn.textContent='Stop'; L.recStartTime=Date.now(); L.events=[]; renderLayers();}}
 function recordEvent(type,val){layers.forEach(L=>{if(L.isRecording){L.events.push({type,val,time:Date.now()-L.recStartTime});}});}
-function playLayer(id){const L=layers.find(x=>x.id===id); if(!L||L.events.length===0)return; L.isPlaying=true; renderLayers(); const start=Tone.now(); for(const ev of L.events){ if(ev.type==='note') synth.triggerAttackRelease(ev.val,'8n',start+ev.time/1000); else if(ev.type==='chord'){const notes=chordBank.includes(ev.val)?ev.val.split(''):[ev.val]; synth.triggerAttackRelease(notes,'1n',start+ev.time/1000);} else if(ev.type==='drum'){const p=drumPlayers[ev.val]; if(p) p.start(start+ev.time/1000);} } setTimeout(()=>{L.isPlaying=false; renderLayers();},L.loopLengthMs);}
+function playLayer(id){const L=layers.find(x=>x.id===id); if(!L||L.events.length===0)return; L.isPlaying=true; renderLayers(); const start=Tone.now(); for(const ev of L.events){ if(ev.type==='note') synth.triggerAttackRelease(ev.val,'8n',start+ev.time/1000); else if(ev.type==='chord'){const notes=chordBank.includes(ev.val)?ev.val.split(''): [ev.val]; synth.triggerAttackRelease(notes,'1n',start+ev.time/1000);} else if(ev.type==='drum'){const p=drumPlayers[ev.val]; if(p) p.start(start+ev.time/1000);} } setTimeout(()=>{L.isPlaying=false; renderLayers();},L.loopLengthMs);}
 
 /* ---------- Grid render ---------- */
 let padMap={};
